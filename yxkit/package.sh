@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WORKDIR=`pwd`
+WORKDIR=`pwd`/..
 BUILDTYPE=Release
 DST=yx-0.0
 
@@ -35,7 +35,7 @@ cp -r ${WORKDIR}/skynet/lualib ${DST}/skynet/lualib
 cp -r ${WORKDIR}/skynet/service ${DST}/skynet/service
 
 # 复制skynet脚本
-cp -r ${WORKDIR}/gateway/skynet/yx ${DST}/skynet/yx
+cp -r ${WORKDIR}/skynet/yx ${DST}/skynet/yx
 
 tar -czf ${DST}.tar.gz ${DST}
 cp ${DST}.tar.gz ${WORKDIR}
