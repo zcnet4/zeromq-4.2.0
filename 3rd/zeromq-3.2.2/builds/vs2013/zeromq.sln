@@ -1,0 +1,27 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30723.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zeromq", "zeromq.vcxproj", "{89512397-4BAC-4FCC-A93E-6371292A2E0B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		LIB Debug MD|Win32 = LIB Debug MD|Win32
+		LIB Debug MT|Win32 = LIB Debug MT|Win32
+		LIB Release MD|Win32 = LIB Release MD|Win32
+		LIB Release MT|Win32 = LIB Release MT|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Debug MD|Win32.ActiveCfg = LIB Debug MD|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Debug MD|Win32.Build.0 = LIB Debug MD|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Debug MT|Win32.ActiveCfg = LIB Debug MT|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Debug MT|Win32.Build.0 = LIB Debug MT|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Release MD|Win32.ActiveCfg = LIB Release MD|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Release MD|Win32.Build.0 = LIB Release MD|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Release MT|Win32.ActiveCfg = LIB Release MT|Win32
+		{89512397-4BAC-4FCC-A93E-6371292A2E0B}.LIB Release MT|Win32.Build.0 = LIB Release MT|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
