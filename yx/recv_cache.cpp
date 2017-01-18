@@ -149,7 +149,7 @@ bool RecvCache::decode_header(MemoryPool* pool, uint16_t* packet_size) {
       recv_total_size_ -= sizeof(uint16_t);
     }
 #ifdef PACKET_SIZE_CONTAINS_PACKET_SIZE
-    *packet_size = packet_size_cache_ - sizeof(uint16_t);
+    *packet_size = packet_size_cache_ -= sizeof(uint16_t);
 #else
     *packet_size = packet_size_cache_;
 #endif // PACKET_SIZE_CONTAINS_PACKET_SIZE

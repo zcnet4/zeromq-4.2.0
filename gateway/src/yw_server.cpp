@@ -638,6 +638,9 @@ bool YWServer::decodeClientMsg(uint32_t uid, yx::Packet& packet, uint16_t& msgTy
   uint8_t v0 = *pp;
   uint8_t v1 = *(pp + 1);
   msgType = ((v1 >> 6) << 8) | v0;
+  if (v1 & 0x3F != 0x02) {
+    return false;
+  }
   pp_size -= (PROTO_HEAD_SIZE - 2);
   pp += (PROTO_HEAD_SIZE - 2);
   //// 这里默认加密是XOR，没压缩。
