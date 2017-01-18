@@ -18,7 +18,8 @@
         #'libuv/uv.gyp:libuv',
       ],
       'defines': [
-		    'YX_IMPLEMENTATION',
+		  'YX_IMPLEMENTATION',
+		  'PACKET_SIZE_CONTAINS_PACKET_SIZE',
       ],
       'include_dirs': [
         "..",

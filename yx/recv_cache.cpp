@@ -125,7 +125,11 @@ bool RecvCache::decode_header(MemoryPool* pool, uint16_t* packet_size) {
     }
   }
   // read
+#ifdef PACKET_SIZE_CONTAINS_PACKET_SIZE
+  if (packet_size_cache_ <= recv_total_size_) {
+#else
   if (packet_size_cache_ + sizeof(uint16_t) <= recv_total_size_) {
+#endif // PACKET_SIZE_CONTAINS_PACKET_SIZE
     buf_block*& bb = buf_block_head_;
     uint16_t readable_size = bb->used - readable_offset_;
     if (readable_size >= sizeof(uint16_t)) {
@@ -144,7 +148,11 @@ bool RecvCache::decode_header(MemoryPool* pool, uint16_t* packet_size) {
       readable_offset_ = sizeof(uint16_t);
       recv_total_size_ -= sizeof(uint16_t);
     }
+#ifdef PACKET_SIZE_CONTAINS_PACKET_SIZE
+    *packet_size = packet_size_cache_ - sizeof(uint16_t);
+#else
     *packet_size = packet_size_cache_;
+#endif // PACKET_SIZE_CONTAINS_PACKET_SIZE
     return true;
   } else {
     return false;

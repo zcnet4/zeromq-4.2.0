@@ -310,7 +310,11 @@ int Tcp::Send(const PacketView& v1) {
   // 优化write req分配。
   uv_write_t* req = reinterpret_cast<uv_write_t*>(loop_->loop_impl()->alloc_uv_req());
   //
+#ifdef PACKET_SIZE_CONTAINS_PACKET_SIZE
+  yx::PacketView* obj_buf = (yx::PacketView*)write_len(req, sizeof(uint16_t) + v1.buf_size(), &buf[0]);
+#else
   yx::PacketView* obj_buf = (yx::PacketView*)write_len(req, v1.buf_size(), &buf[0]);
+#endif // PACKET_SIZE_CONTAINS_PACKET_SIZE
   ::new (obj_buf)yx::PacketView(v1);
   req->data = (uint64_t*)1;
   //
@@ -329,8 +333,12 @@ int Tcp::Send2(const PacketView& v1, const PacketView& v2) {
   // 优化write req分配。
   uv_write_t* req = reinterpret_cast<uv_write_t*>(loop_->loop_impl()->alloc_uv_req());
   //
+#ifdef PACKET_SIZE_CONTAINS_PACKET_SIZE
+  yx::PacketView* obj_buf = (yx::PacketView*)write_len(req, sizeof(uint16_t) + v1.buf_size() + v2.buf_size(), &buf[0]);
+#else
   yx::PacketView* obj_buf = (yx::PacketView*)write_len(req, v1.buf_size() + v2.buf_size(), &buf[0]);
-  ::new (obj_buf)     yx::PacketView(v1);
+#endif // PACKET_SIZE_CONTAINS_PACKET_SIZE
+  ::new (obj_buf)yx::PacketView(v1);
   ::new (obj_buf + 1) yx::PacketView(v2);
   req->data = (uint64_t*)2;
   //
