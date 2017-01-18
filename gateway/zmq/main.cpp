@@ -9,6 +9,7 @@
 #include <string>
 #include "yx/logging.h"
 #include "yx/glogger_async.h"
+#include "../src/gateway_gameserver_def.h"
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -120,7 +121,7 @@ protected:
     //
     int result = -1;
 #ifdef OS_WIN
-    const char* client_proto_name = "d:\\yx_code\\yx\\build\\proto_client.pb";
+    const char* client_proto_name = "d:\\yx_code\\yx\\gateway\\conf\\proto_client.pb";
 #else
     const char* client_proto_name = "proto_client.pb";
 #endif // OS_WIN
@@ -133,7 +134,7 @@ protected:
     }
     //
 #ifdef OS_WIN
-    const char* server_proto_name = "d:\\yx_code\\yx\\build\\proto_server.pb";
+    const char* server_proto_name = "d:\\yx_code\\yx\\gateway\\conf\\proto_server.pb";
 #else
     const char* server_proto_name = "proto_server.pb";
 #endif
@@ -185,15 +186,14 @@ protected:
     return true;
   }
   void handle_message(uint32_t uid, uint32_t type, pbc_slice* data) {
-#define QMT_GAME     1  // 游戏内协议消息转发
-#define QMT_ADD_PEER 2  // 连接建立
-#define QMT_DEL_PEER 3  // 连接断开
-#define QMT_PEER_NOT_EXIST 4  // 连接不存在
-#define QMT_PEER_LOGTOU_AND_SAVED 5  // 通知gateway用户已经退出并存盘成功
-#define QMT_REPORT_ONLINE_NUM 6 // 通知gateway在线数
-#define QMT_INVALID  10  // 无效的消息
-    if (QMT_ADD_PEER == type) {
-      LOG(WARNING) << "add peer uid:" << uid;
+    if (QMT_GATEWAY_START == type) {
+      LOG(WARNING) << "QMT_GATEWAY_START";
+      std::chrono::milliseconds msec(200);
+      std::this_thread::sleep_for(msec);
+      SendProto(0, QMT_GAMESERVER_START, nullptr);
+      return;
+    } else if (QMT_GATEWAY_ACTIVE == type) {
+      LOG(WARNING) << "QMT_GATEWAY_ACTIVE";
       return;
     }
     pbc_rmessage* pmsg = pbc_rmessage_new(client_pbc_env_, "Message", data);

@@ -161,6 +161,11 @@ void BackendProcessor::ProcessTcpInput(uint16_t op, uint64_t id, yx::Packet& pac
       }
     }
   } break;
+  case TCP_OP::ZMQ_SEND: {
+    zmq_server_.SendRaw(id, packet);
+  } break;
+  default:
+    break;
   }
 }
 

@@ -25,13 +25,6 @@ namespace yx {
   class Loop;
   class Packet;
 }
-#define QMT_GAME     1  // 游戏内协议消息转发
-#define QMT_ADD_PEER 2  // 连接建立
-#define QMT_DEL_PEER 3  // 连接断开
-#define QMT_PEER_NOT_EXIST 4  // 连接不存在
-#define QMT_PEER_LOGTOU_AND_SAVED 5  // 通知gateway用户已经退出并存盘成功
-#define QMT_REPORT_ONLINE_NUM 6 // 通知gateway在线数
-#define QMT_INVALID  10  // 无效的消息
 //////////////////////////////////////////////////////////////////////////
 // YWServer
 class YWServer
@@ -78,7 +71,8 @@ public:
   @func			: processGameMsg
   @brief		: 
   */
-  bool processGameMsg(uint32_t uid, uint32_t type, const uint8_t* buf, uint16_t buf_size, yx::Packet& packet);
+  bool processGameMsg(uint32_t world_id, uint32_t uid, uint32_t type, 
+    const uint8_t* buf, uint16_t buf_size, yx::Packet& packet);
   /*
   @func			: processGameServerStatus
   @brief		: 
@@ -89,6 +83,16 @@ public:
   @brief		: 
   */
   void removeAgent(uint64_t vtcp_id);
+  /*
+  @func			: sendGatewayStartToGameServer
+  @brief		: 
+  */
+  void sendGatewayStartToGameServer(uint32_t world_id);
+  /*
+  @func			: sendGatewayActiveToGameServer
+  @brief		: 
+  */
+  void sendGatewayActiveToGameServer(uint32_t world_id);
 private:
   /*
   @func			: init_protos
@@ -107,14 +111,19 @@ private:
   bool initSpawnWorldIdSet();
   /*
   @func			: decodeClientMsg
-  @brief		: 
+  @brief		: 返回服务端命令，参数返回原始数据内容。
   */
-  pbc_rmessage* decodeClientMsg(yx::Packet& packet, pbc_slice* slice);
+  bool decodeClientMsg(uint32_t uid, yx::Packet& packet, uint16_t& msgType, pbc_slice* slice);
   /*
   @func			: ticks_now
   @brief		: 
   */
   uint64_t ticks_now() const;
+  /*
+  @func			: quitClientsByWorldId
+  @brief		: 
+  */
+  void quitClientsByWorldId(uint32_t world_id);
 private:
   class AgentYW;
   /*
@@ -163,10 +172,15 @@ private:
   */
   bool sendMsgToClient(AgentYW* agent, int32_t type, pbc_slice* data);
   /*
-  @func			: sendMsgToClientImpl
+  @func			: sendRawMsgToClient
   @brief		: 发到窗户端。
   */
-  bool sendMsgToClientImpl(AgentYW* agent, yx::Packet& packet);
+  bool sendRawMsgToClient(AgentYW* agent, yx::Packet& packet);
+  /*
+  @func			: sendRawMsgToAllClient
+  @brief		: 
+  */
+  void sendRawMsgToAllClient(uint32_t world_id, yx::Packet& packet);
   /*
   @func			: sendAccessDeniedToClient
   @brief		: 

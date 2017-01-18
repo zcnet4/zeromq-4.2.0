@@ -108,7 +108,18 @@ void MainProcessor::ProcessTcpInput(uint16_t op, uint64_t id, yx::Packet& packet
     buf = yx::_read_u32(buf, &uid);
     buf = yx::_read_u32(buf, &type);
     uint16_t buf_size = packet.buf_size() - (buf - packet.buf());
-    yw_server_->processGameMsg(uid, type, buf, buf_size, packet);
+    uint32_t world_id = static_cast<uint32_t>(packet.param());
+    yw_server_->processGameMsg(world_id, uid, type, buf, buf_size, packet);
+#endif // YX_YW
+  } break;
+  case TCP_OP::ZMQ_CONNECT: {
+#ifdef YX_YW
+    yw_server_->sendGatewayStartToGameServer(static_cast<uint32_t>(id));
+#endif // YX_YW
+  } break;
+  case TCP_OP::ZMQ_ACTIVE: {
+#ifdef YX_YW
+    yw_server_->sendGatewayActiveToGameServer(static_cast<uint32_t>(id));
 #endif // YX_YW
   } break;
   default:

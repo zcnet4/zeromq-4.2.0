@@ -41,6 +41,11 @@ namespace TCP_OP {
   static const uint16_t SKYNET_F2F = 0x0041;
   //
   static const uint16_t PINGPONG_SERVER = 0x0050;
+  //
+  static const uint16_t ZMQ_SERVER = 0x0060;
+  static const uint16_t ZMQ_CONNECT = 0x0061;
+  static const uint16_t ZMQ_SEND = 0x0062;
+  static const uint16_t ZMQ_ACTIVE = 0x0063;
 }
 // -------------------------------------------------------------------------
 #endif /* OP_DEFS_H_ */

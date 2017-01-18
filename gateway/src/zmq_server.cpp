@@ -14,6 +14,7 @@
 #include "yx/logging.h"
 #include "gateway.h"
 #include "yx/tcp_delegate.h"
+#include "op_defs.h"
 // -------------------------------------------------------------------------
 //////////////////////////////////////////////////////////////////////////
 // ZmqServer::Zmq
@@ -25,6 +26,8 @@ public:
   {
     // http://www.cnblogs.com/fengbohello/p/4354989.html
     zmq_socket_ = zmq_socket(zmq_ctx, ZMQ_PAIR);
+    m_GameServerStarted = false;
+    m_GameServerActive = false; // 初始化时为false,不允许往RecvClientMsgsQueue里添加消息。只有收到网关心跳后才能发消息
   }
   ~Zmq()
   {
@@ -35,15 +38,15 @@ public:
   @func			: 
   @brief		: 
   */
-  void connect(const std::string& server) {
+  bool connect(const std::string& server) {
 #ifdef _DEBUG
     server_ = server;
 #endif // _DEBUG
     //http://www.cnblogs.com/fengbohello/p/4231319.html
     if (0 == zmq_connect(zmq_socket_, server.c_str())) {
-
+      return true;
     } else {
-
+      return false;
     }
   }
   /*
@@ -95,6 +98,8 @@ private:
 #ifdef _DEBUG
   std::string server_;
 #endif // _DEBUG
+  bool m_GameServerStarted;  // gameServer是否启动
+  bool m_GameServerActive;
 };
 //////////////////////////////////////////////////////////////////////////
 // ZmqServer
@@ -128,9 +133,13 @@ void ZmqServer::Start() {
     const char* server_host = cfg.getZmqServerAndWorldId(i, world_id);
     if (server_host && *server_host) {
       std::unique_ptr<Zmq> end(new ZmqServer::Zmq(zmq_ctx_, world_id));
-      end->connect(server_host);
       LOG(WARNING) << "zmq connect " << server_host;
+      bool success = end->connect(server_host);
       zmqs_.insert(zmqs_t::value_type(world_id, std::move(end)));
+      // 启动成功则通知
+      if (success) {
+        InputToMain(TCP_OP::ZMQ_CONNECT, world_id, yx::Packet(0));
+      }
     }
   }
   //
@@ -250,7 +259,24 @@ void ZmqServer::poll_thread()
 void ZmqServer::Send(uint64_t zmq_id, const yx::Packet& packet) {
   auto iter = zmqs_.find(zmq_id);
   if (zmqs_.end() != iter) {
-    iter->second->send(packet);
+    Zmq* zmq = iter->second.get();
+    if (zmq->m_GameServerActive)
+      zmq->send(packet);
+  } else {
+    LOG(ERROR) << "can not find ZmqClient bound to worldId " << zmq_id << ", drop msg";
+  }
+}
+
+/*
+@func			: SendRaw
+@brief		:
+*/
+void ZmqServer::SendRaw(uint64_t zmq_id, const yx::Packet& packet) {
+  auto iter = zmqs_.find(zmq_id);
+  if (zmqs_.end() != iter) {
+    Zmq* zmq = iter->second.get();
+    //if (zmq->m_GameServerActive)
+      zmq->send(packet);
   } else {
     LOG(ERROR) << "can not find ZmqClient bound to worldId " << zmq_id << ", drop msg";
   }
@@ -264,6 +290,7 @@ void ZmqServer::set_op_type(uint32_t op_type) {
 #include "pbc.h"
 #include "gateway_constants.h"
 #include "gateway_util.h"
+#include "gateway_gameserver_def.h"
 extern pbc_env* g_yw_server_pbc_env;
 #endif // YX_YW
 
@@ -290,16 +317,35 @@ bool ZmqServer::Recv(ZmqServer::Zmq* z) {
     if (queued_msg) {
       uint32_t uid = pbc_rmessage_integer(queued_msg, kPROTO_QueuedMsgUid, 0, nullptr);
       uint32_t type = pbc_rmessage_integer(queued_msg, kPROTO_QueuedMsgType, 0, nullptr);
-      int data_size = 0;
-      const char* data = pbc_rmessage_string(queued_msg, kPROTO_QueuedMsgData, 0, &data_size);
-      //
-      yx::Packet packet(sizeof(uint32_t) + sizeof(uint32_t) + data_size);
-      uint8_t* buf = yx::_write_u32(packet.mutable_buf(), uid);
-      buf = yx::_write_u32(buf, type);
-      memcpy(buf, data, data_size);
-      //
-      InputToMain(op_type_, z->zmq_id(), packet);
-      success = true;
+      if (z->m_GameServerStarted) {
+        int data_size = 0;
+        const char* data = pbc_rmessage_string(queued_msg, kPROTO_QueuedMsgData, 0, &data_size);
+        //
+        yx::Packet packet(sizeof(uint32_t) + sizeof(uint32_t) + data_size);
+        uint8_t* buf = yx::_write_u32(packet.mutable_buf(), uid);
+        buf = yx::_write_u32(buf, type);
+        memcpy(buf, data, data_size);
+        // 采用packet param记录world_id。by ZC. 2017-1-18 20:44.
+        packet.set_param(z->zmq_id());
+        //
+        InputToMain(op_type_, z->zmq_id(), packet);
+        if (QMT_GAME_BREATHE == type) {
+          //z->m_LastBreatheTimestamp = g_timeNow;
+          z->m_GameServerActive = true;
+          LOG(INFO) << "Gateway recv game breathe.";
+        }
+        success = true;
+      } else {
+        // 没有启动。
+        if (type == QMT_GAMESERVER_START || type == QMT_GAMESERVER_ACTIVE) {
+          z->m_GameServerStarted = true;
+          if (type == QMT_GAMESERVER_START) {
+            //clientMananger->quitClientsByWorldId(worldid);
+            //z->sendGatewayActiveToGameServer();
+            InputToMain(TCP_OP::ZMQ_ACTIVE, z->zmq_id(), yx::Packet(0));
+          }
+        }
+      }
       //
       pbc_rmessage_delete(queued_msg);
     } else {

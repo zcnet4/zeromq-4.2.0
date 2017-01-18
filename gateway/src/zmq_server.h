@@ -38,6 +38,11 @@ public:
   @brief		: 
   */
   void Send(uint64_t zmq_id, const yx::Packet& packet);
+  /*
+  @func			: SendRaw
+  @brief		:
+  */
+  void SendRaw(uint64_t zmq_id, const yx::Packet& packet);
   void set_op_type(uint32_t op_type);
 protected:
   /*
