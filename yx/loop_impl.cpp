@@ -77,9 +77,7 @@ LoopImpl::LoopImpl(Loop* loop)
   uv_prepare_init(&uv_loop_, &queue_watcher_);
   queue_watcher_.data = this;
   // 接下来初始化时间。
-  uv_update_time(&uv_loop_);
-  ticks_point_ = uv_now(&uv_loop_);
-  time_now_ = yx::Time::Now().ToMillisecond();
+  time_refresh();
 	//
 	task_runner_.reset(new TaskRunnerImpl(this));
   //
@@ -189,6 +187,18 @@ uint64_t LoopImpl::time_now() {
   //
   return time_now_;
 }
+
+/*
+@func			: time_refresh
+@brief		:
+*/
+void LoopImpl::time_refresh() {
+  // 接下来初始化时间。
+  uv_update_time(&uv_loop_);
+  ticks_point_ = uv_now(&uv_loop_);
+  time_now_ = yx::Time::Now().ToMillisecond();
+}
+
 
 void LoopImpl::queue_cb(uv_prepare_t* handle) {
   LoopImpl* impl = (LoopImpl*)handle->data;

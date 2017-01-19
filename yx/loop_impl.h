@@ -80,6 +80,11 @@ public:
   */
   uint64_t time_now();
   /*
+  @func			: time_refresh
+  @brief		: 
+  */
+  void time_refresh();
+  /*
   @func			: alloc_fd
   @brief		: 分配文件描述符。
   */

@@ -343,11 +343,16 @@ uint64_t SocketManager::SockNew(void* obj, bool is_tcp) {
   } else {
     sock->set_udp(reinterpret_cast<Udp*>(obj));
   }
+  uint64_t loop_count = 0;
   do {
     fd_id = loop_->loop_impl()->alloc_fd();
     std::pair<sockets_t::iterator, bool> result = sockets_.emplace(sockets_t::value_type(fd_id, sock));
     if (result.second) {
       break;
+    }
+    if (++loop_count > 1000){
+      loop_->loop_impl()->time_refresh();
+      loop_count = 0;
     }
   } while (true);
   //

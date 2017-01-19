@@ -78,7 +78,8 @@ restart:
     time = now_time - epoch_;
   } else {
     // if (last_time_ > now_time) 
-    time = last_time_ - epoch_;
+    now_time++;
+    goto restart;
   }
   // 保留后40位时间
   new_id |= (time & 0x0FFFFFFFFFF) << 23;
