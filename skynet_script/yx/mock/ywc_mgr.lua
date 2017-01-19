@@ -9,7 +9,7 @@ local NORET = {}
 function YWC_MGR.Init()
 	local ywc1 = _NEW_YWC()
 	ywc1:connect_gateway()
-	ywc1:login()
+	ywc1:login(1, 1767)
 	ywc1:send("loveMM")
 	--ywc1:sendtest("loveMM")
 end

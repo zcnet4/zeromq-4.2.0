@@ -27,7 +27,6 @@ public:
     // http://www.cnblogs.com/fengbohello/p/4354989.html
     zmq_socket_ = zmq_socket(zmq_ctx, ZMQ_PAIR);
     m_GameServerStarted = false;
-    m_GameServerActive = false; // 初始化时为false,不允许往RecvClientMsgsQueue里添加消息。只有收到网关心跳后才能发消息
   }
   ~Zmq()
   {
@@ -99,7 +98,6 @@ private:
   std::string server_;
 #endif // _DEBUG
   bool m_GameServerStarted;  // gameServer是否启动
-  bool m_GameServerActive;
 };
 //////////////////////////////////////////////////////////////////////////
 // ZmqServer
@@ -259,24 +257,7 @@ void ZmqServer::poll_thread()
 void ZmqServer::Send(uint64_t zmq_id, const yx::Packet& packet) {
   auto iter = zmqs_.find(zmq_id);
   if (zmqs_.end() != iter) {
-    Zmq* zmq = iter->second.get();
-    if (zmq->m_GameServerActive)
-      zmq->send(packet);
-  } else {
-    LOG(ERROR) << "can not find ZmqClient bound to worldId " << zmq_id << ", drop msg";
-  }
-}
-
-/*
-@func			: SendRaw
-@brief		:
-*/
-void ZmqServer::SendRaw(uint64_t zmq_id, const yx::Packet& packet) {
-  auto iter = zmqs_.find(zmq_id);
-  if (zmqs_.end() != iter) {
-    Zmq* zmq = iter->second.get();
-    //if (zmq->m_GameServerActive)
-      zmq->send(packet);
+    iter->second->send(packet);
   } else {
     LOG(ERROR) << "can not find ZmqClient bound to worldId " << zmq_id << ", drop msg";
   }
@@ -328,11 +309,6 @@ bool ZmqServer::Recv(ZmqServer::Zmq* z) {
         memcpy(buf, data, data_size);
         //
         InputToMain(op_type_, z->zmq_id(), packet);
-        if (QMT_GAME_BREATHE == type) {
-          //z->m_LastBreatheTimestamp = g_timeNow;
-          z->m_GameServerActive = true;
-          LOG(INFO) << "Gateway recv game breathe.";
-        }
         success = true;
       } else {
         // 没有启动。

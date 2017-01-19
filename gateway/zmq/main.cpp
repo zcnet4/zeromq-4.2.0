@@ -9,6 +9,8 @@
 #include <string>
 #include "yx/logging.h"
 #include "yx/glogger_async.h"
+#include "yx/packet_view.h"
+#include "../src/networkprotocol.h"
 #include "../src/gateway_gameserver_def.h"
 #ifdef _WIN32
 #include <direct.h>
@@ -103,7 +105,7 @@ public:
       //
       std::this_thread::sleep_for(msec);
       if (++count % 10 == 9)
-        SendTest();
+        SendBreathe();
     };
   }
   void Stop() {
@@ -195,20 +197,136 @@ protected:
     } else if (QMT_GATEWAY_ACTIVE == type) {
       LOG(WARNING) << "QMT_GATEWAY_ACTIVE";
       return;
-    }
-    pbc_rmessage* pmsg = pbc_rmessage_new(client_pbc_env_, "Message", data);
-    if (pmsg) {
+    } else if (QMT_CLIENT == type) {
+      handle_message_client(uid, data);
+      return;
+    } else if (QMT_GAME == type) {
       // 转发的数据就原包回复。
-      if (QMT_GAME == type) {
-        SendProto(uid, type, data);
-      }
-      pbc_rmessage_delete(pmsg);
+      SendProto(uid, type, data);
+      return;
     } else {
-      LOG(ERROR) << "Message Proto error";
+      LOG(WARNING) << "not supported, cmd:" << type;
     }
   }
 
-  void SendTest() {
+  void handle_message_client(uint32_t uid, pbc_slice* data) {
+    if (data->len < 4) {
+      LOG(ERROR) << "Wrong protocol package - 1";
+      return;
+    }
+    uint16_t len = 0;
+    yx::_read_u16(static_cast<uint8_t*>(data->buffer), &len);
+    if (len != data->len) {
+      LOG(ERROR) << "Wrong protocol package - 2";
+      return;
+    }
+    uint8_t v0 = *(static_cast<uint8_t*>(data->buffer) + 2);
+    uint8_t v1 = *(static_cast<uint8_t*>(data->buffer) + 3);
+    uint16_t cmd = ((v1 >> 6) << 8) | v0;
+    if ((v1 & 0x3F) != 0x02) {
+      LOG(ERROR) << "Wrong protocol package - 3";
+      return;
+    }
+    data->len -= 4;
+    data->buffer = static_cast<uint8_t*>(data->buffer) + 4;
+    // 这里默认解密是XOR，没压缩。
+    for (int i = 0; i < data->len; i++) {
+      static_cast<uint8_t*>(data->buffer)[i] ^= 165;
+    }
+    if (TOSERVER_QUEUE_SERVER_VALIDATE == cmd) {
+      pbc_slice proto_slice;
+      uint32_t proto_uid = 0;
+      uint32_t world_id = 0;
+      pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, "c2s_queue_server_validate", data);
+      if (rmsg) {
+        proto_uid = pbc_rmessage_integer(rmsg, "id", 0, nullptr);
+        uint32_t world_id = pbc_rmessage_integer(rmsg, "worldid", 0, nullptr);
+        pbc_rmessage_delete(rmsg);
+        //
+        if (proto_uid == uid) {
+          proto_slice.buffer = "1";
+          proto_slice.len = sizeof("1");
+        } else {
+          proto_slice.buffer = "0";
+          proto_slice.len = sizeof("0");
+        }
+      } else {
+        LOG(ERROR) << "Wrong protocol package. cmd:" << TOSERVER_QUEUE_SERVER_VALIDATE;
+        proto_slice.buffer = "0";
+        proto_slice.len = sizeof("0");
+      }
+      //
+      SendProto(uid, QMT_QUEUESERVER_RESULT, &proto_slice);
+      LOG(WARNING) << "Reply QMT_QUEUESERVER_RESULT world_id:" << world_id << " uid:" << uid;
+      return;
+    } else if (TOSERVER_LOGIN == cmd) {
+      uint32_t proto_uid = 0;
+      uint32_t world_id = 0;
+      pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, "c2s_login", data);
+      if (rmsg) {
+        proto_uid = pbc_rmessage_integer(rmsg, "uid", 0, nullptr);
+        uint32_t world_id = pbc_rmessage_integer(rmsg, "world_id", 0, nullptr);
+        pbc_rmessage_delete(rmsg);
+        //
+        if (proto_uid == uid) {
+          uint8_t ok[64] = { 0 };
+          uint8_t* p = yx::_write_u16(ok, 4);
+          int p_type = TOCLIENT_BREATH;
+          p[0] = p_type & 0xff;
+          p[1] = 0;
+          p[1] |= ((p_type >> 8) << 6);
+          uint8_t encryptType = 1;
+          p[1] |= (encryptType << 1);
+          //
+          pbc_slice proto_slice;
+          proto_slice.buffer = ok;
+          proto_slice.len = 4;
+          SendProto(uid, QMT_GAME, &proto_slice);
+          LOG(WARNING) << "Reply TOSERVER_LOGIN world_id:" << world_id << " uid:" << uid;
+          return;
+        }
+
+        uint8_t ok[64] = { 0 };
+        uint8_t* p = yx::_write_u16(ok, 4);
+        int p_type = TOCLIENT_BREATH;
+        p[0] = p_type & 0xff;
+        p[1] = 0;
+        p[1] |= ((p_type >> 8) << 6);
+        uint8_t encryptType = 1;
+        p[1] |= (encryptType << 1);
+        //
+        pbc_slice proto_slice;
+        proto_slice.buffer = ok;
+        proto_slice.len = 4;
+        SendProto(uid, QMT_GAME, &proto_slice);
+        LOG(WARNING) << "Reply TOSERVER_LOGIN world_id:" << world_id << " uid:" << uid;
+        return;
+      } else {
+        uint8_t ok[64] = { 0 };
+        uint8_t* p = yx::_write_u16(ok, 4);
+        int p_type = TOCLIENT_BREATH;
+        p[0] = p_type & 0xff;
+        p[1] = 0;
+        p[1] |= ((p_type >> 8) << 6);
+        uint8_t encryptType = 1;
+        p[1] |= (encryptType << 1);
+        //
+        pbc_slice proto_slice;
+        proto_slice.buffer = ok;
+        proto_slice.len = 4;
+        SendProto(uid, QMT_GAME, &proto_slice);
+        LOG(WARNING) << "Reply TOSERVER_LOGIN world_id:" << world_id << " uid:" << uid;
+        return;
+      }
+      //
+      
+      return;
+    }
+  }
+
+  void SendBreathe() {
+    SendProto(0, QMT_GAME_BREATHE, nullptr);
+    //
     pbc_wmessage* msg = pbc_wmessage_new(server_pbc_env_, "s2s_online_num");
     if (msg) {
       pbc_wmessage_integer(msg, "world_id", 1, 0);

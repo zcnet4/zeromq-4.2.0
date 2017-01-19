@@ -10,6 +10,7 @@
 #include "yx/yx_util.h"
 #include "yx/loop.h"
 #include "yx/packet.h"
+#include "yx/packet_view.h"
 #include "pbc.h"
 #include "networkprotocol.h"
 #include "gateway_gameserver_def.h"
@@ -30,6 +31,7 @@
 #define rand_r(x) rand()
 #endif // OS_WIN
 // -------------------------------------------------------------------------
+#define PROTO_HEAD_SIZE 4
 //////////////////////////////////////////////////////////////////////////
 // AgentYW
 class YWServer::AgentYW
@@ -40,8 +42,8 @@ public:
   enum GW_CLIENT_STATUS {
     GW_CLIENT_STATUS_NORMAL,            // 正常状态
     GW_CLIENT_STATUS_SWITCHING_WORLD,   // 收到客户端switch world请求后进入该状态
-    GW_CLIENT_STATUS_LOGGING_OUT,       // 收到客户端logout请求后进入该状态
-    GW_CLIENT_STATUS_BEING_KICKED,      // 收到一个相同uid的INIT_LEGACY请求，老的client进入该状态
+    GW_CLIENT_STATUS_LOGGING_OUT,        // 收到客户端logout请求后进入该状态
+    GW_CLIENT_STATUS_IN_QUEUE,          // yx增加在排队状态。by ZC. 2017-1-19.
     GW_CLIENT_STATUS_DISCONNECT,        // yx增加断开状态。by ZC. 2016-11-29.
   };
 public:
@@ -394,10 +396,15 @@ void YWServer::removeAgent(uint64_t vtcp_id) {
 @func			: pushMsgToGameServer
 @brief		: 发到游戏服务器。
 */
-void YWServer::pushMsgToGameServer(uint32_t world_id, int64_t uid, int32_t type, pbc_slice* data) {
+bool YWServer::pushMsgToGameServer(uint32_t world_id, int64_t uid, int32_t type, pbc_slice* data) {
+  auto iter(games_.find(world_id));
+  if (games_.end() == iter || !iter->second.m_GameServerActive) {
+    return false;
+  }
   yx::Packet packet(buildQueuedMsg(uid, type, data));
-  //
   InputToBackend((TCP_OP::YW_M2B), world_id, packet);
+  //
+  return true;
 }
 
 /*
@@ -554,13 +561,13 @@ bool YWServer::processGameMsg(uint32_t world_id, uint64_t uid, uint32_t type,
     break;
   case QMT_GAME: {
     // 配置好偏移量。
-    packet.set_param(buf - packet.buf());
+    packet.set_param(buf - packet.buf() + sizeof(uint16_t));
     // 这里不做Xor，GS已做了Xor。by ZC. 2017-1-18 20:13.
     sendRawMsgToClient(GetAgentFromUid(uid), packet);
   } break;
   case QMT_GAME_BROADCAST: {
     // 配置好偏移量。
-    packet.set_param(buf - packet.buf());
+    packet.set_param(buf - packet.buf() + sizeof(uint16_t));
     // 这里不做Xor，GS已做了Xor。by ZC. 2017-1-18 20:13.
     sendRawMsgToAllClient(world_id, packet);
   } break;
@@ -568,6 +575,20 @@ bool YWServer::processGameMsg(uint32_t world_id, uint64_t uid, uint32_t type,
     char string_buf[128] = { 0 };
     memcpy(string_buf, buf, std::min<uint16_t>(buf_size, 128));
     processQueueServerValidateResult(world_id, uid, atoi(string_buf));
+  } break;
+  case QMT_GAME_BREATHE: {
+    auto iter(games_.find(world_id));
+    if (games_.end() != iter) {
+      Game& game = iter->second;
+      game.m_GameServerActive = true;
+      game.m_LastBreatheTimestamp = time_now();
+    } else {
+      Game game;
+      game.m_GameServerActive = true;
+      game.m_LastBreatheTimestamp = time_now();
+      games_.emplace(games_t::value_type(world_id, game));
+    }
+    LOG(INFO) << "Gateway recv game breathe.";
   } break;
   default:
     LOG(ERROR) << "Gateway recv msg from game server, unknown type:" << type;
@@ -589,9 +610,6 @@ void YWServer::onPlayerSaved(AgentYW* agent) {
   switch (agent->status()) {
   case AgentYW::GW_CLIENT_STATUS_SWITCHING_WORLD:
     onPlayerSavedSwitchingWorld(agent);
-    return;
-  case AgentYW::GW_CLIENT_STATUS_BEING_KICKED:
-    onPlayerSavedBeingKicked(agent);
     return;
   case AgentYW::GW_CLIENT_STATUS_LOGGING_OUT:
     onPlayerSavedLoggingOut(agent);
@@ -670,34 +688,30 @@ yx::Packet YWServer::buildQueuedMsg(int64_t uid, int32_t type, pbc_slice* data) 
 @brief		: 返回服务端命令，参数返回原始数据内容。
 */
 bool YWServer::decodeClientMsg(uint64_t uid, yx::Packet& packet, uint16_t& msgType, pbc_slice* slice) {
-  uint8_t* pp = const_cast<uint8_t*>(packet.buf() + packet.offset());
-  int pp_size = packet.buf_size() - packet.offset();
+  //因为YW需要把包长度两个字节发到GameServer中，而yx框架会默认去掉包长度两个字节。
+  //故这里做适配。
+  CHECK(0 == packet.offset());
+  uint8_t* pp = const_cast<uint8_t*>(packet.buf() - sizeof(uint16_t));
+  int pp_size = packet.buf_size() + sizeof(uint16_t);
+  yx::_write_u16(pp, pp_size);
 //  通信协议头
 /*
  0       7        15       23      31
  --------|--------|--------|--|------
        mLen       |   mCmd    | mFlag
 */
-#define PROTO_HEAD_SIZE 4
-  if (pp_size + 2 < PROTO_HEAD_SIZE) {
+  if (pp_size < PROTO_HEAD_SIZE) {
     // should not come here
     LOG(ERROR) << "client change protocol, uid:" << uid;
     //askGameToLogout(client->m_CurrWorldId, client->m_Uid, client->m_Status);
     return false;
   }
-  uint8_t v0 = *pp;
-  uint8_t v1 = *(pp + 1);
+  uint8_t v0 = *(pp + 2);
+  uint8_t v1 = *(pp + 3);
   msgType = ((v1 >> 6) << 8) | v0;
   if ((v1 & 0x3F) != 0x02) {
     return false;
   }
-  pp_size -= (PROTO_HEAD_SIZE - 2);
-  pp += (PROTO_HEAD_SIZE - 2);
-  //// 这里默认加密是XOR，没压缩。
-  //for (int i = 0; i < pp_size; i++) {
-  //  pp[i] ^= 165;
-  //}
-  //
   slice->buffer = (void*)pp;
   slice->len = pp_size;
   //
@@ -759,10 +773,18 @@ bool YWServer::processClientMsg(Agent* a, yx::Packet& packet) {
     // 处理排队服务器协议
     if (proto_type == TOSERVER_QUEUE_SERVER_VALIDATE) {
       if (processQueueServerMsg(agent, &slice)) {
+        agent->set_status(AgentYW::GW_CLIENT_STATUS_IN_QUEUE);
         return true;
       } else {
         // delete agent
         agent->set_status(AgentYW::GW_CLIENT_STATUS_DISCONNECT);
+        return false;
+      }
+    } else {
+      if (AgentYW::GW_CLIENT_STATUS_IN_QUEUE != agent->status()) {
+        // Client连接成功后，发送过来的第一条协议不是登录协议，踢掉Client
+        LOG(ERROR) << "client first protocol is not LOGIN, remove it :" << proto_type;
+        askGameToLogout(agent);
         return false;
       }
     }
@@ -778,12 +800,7 @@ bool YWServer::processClientMsg(Agent* a, yx::Packet& packet) {
         return false;
       }
     }
-    // Client连接成功后，发送过来的第一条协议不是登录协议，踢掉Client
-    if (proto_type != TOSERVER_QUEUE_SERVER_VALIDATE) {
-      LOG(ERROR) << "client first protocol is not LOGIN, remove it :" << proto_type;
-      askGameToLogout(agent);
-      return false;
-    }
+    
   } else {
     if (agent->status() != AgentYW::GW_CLIENT_STATUS_NORMAL) {
       LOG(INFO) << "client is switching world, drop msg";
@@ -801,11 +818,6 @@ bool YWServer::processClientMsg(Agent* a, yx::Packet& packet) {
 @brief		:
 */
 void YWServer::askGameToLogout(AgentYW* agent) {
-  if (agent->status() == AgentYW::GW_CLIENT_STATUS_BEING_KICKED) {
-    // 如果该客户端正在被踢当中，则不需再次发生logout给game server
-    return;
-  }
-
   if (agent->status() == AgentYW::GW_CLIENT_STATUS_LOGGING_OUT) {
     // 如果该客户端已经发送了logout，则不需再次发生logout给game server
     return;
@@ -889,7 +901,7 @@ void YWServer::sendToClientCanSendLogin(uint32_t world_id, uint64_t uid, uint64_
     //
     pbc_slice serialize_slice;
     pbc_wmessage_buffer(wmsg, &serialize_slice);
-    sendMsgToClient(nullptr, TOCLIENT_CAN_SEND_LOGIN, &serialize_slice);
+    sendMsgToClient(static_cast<AgentYW*>(GetAgent(login.vtcp_id)), TOCLIENT_CAN_SEND_LOGIN, &serialize_slice);
     //
     pbc_wmessage_delete(wmsg);
   }
@@ -916,9 +928,11 @@ YWServer::AgentYW* YWServer::GetAgentFromUid(uint64_t uid) {
 @brief		:
 */
 void YWServer::sendGatewayStartToGameServer(uint32_t world_id) {
-  yx::Packet packet(buildQueuedMsg(0, QMT_GATEWAY_START, nullptr));
+  Game game;
+  games_.emplace(games_t::value_type(world_id, game));
   //
-  InputToBackend(TCP_OP::ZMQ_SEND, world_id, packet);
+  yx::Packet packet(buildQueuedMsg(0, QMT_GATEWAY_START, nullptr));
+  InputToBackend((TCP_OP::YW_M2B), world_id, packet);
 }
 
 /*
@@ -930,7 +944,7 @@ void YWServer::sendGatewayActiveToGameServer(uint32_t world_id) {
   quitClientsByWorldId(world_id);
   //
   yx::Packet packet(buildQueuedMsg(0, QMT_GATEWAY_ACTIVE, nullptr));
-  InputToBackend(TCP_OP::ZMQ_SEND, world_id, packet);
+  InputToBackend((TCP_OP::YW_M2B), world_id, packet);
 }
 
 /*
@@ -959,12 +973,13 @@ bool YWServer::processQueueServerMsg(YWServer::AgentYW* agent, pbc_slice* msg) {
   {
     // 这里默认解密是XOR，没压缩。
     uint8_t xor_buffer[64 * 1026] = { 0 };
-    for (int i = 0; i < msg->len; i++) {
-      xor_buffer[i] = static_cast<char*>(msg->buffer)[i] ^ 165;
-    }
     pbc_slice slice;
     slice.buffer = xor_buffer;
-    slice.len = msg->len;
+    slice.len = msg->len - PROTO_HEAD_SIZE;
+    uint8_t* proto_data = static_cast<uint8_t*>(msg->buffer) + PROTO_HEAD_SIZE;
+    for (int i = 0; i < slice.len; i++) {
+      xor_buffer[i] = proto_data[i] ^ 165;
+    }
     pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, kPROTO_C2SQueueServerValidate, &slice);
     if (rmsg) {
       uint32_t uid_h = 0;
@@ -1036,8 +1051,7 @@ bool YWServer::processQueueServerMsg(YWServer::AgentYW* agent, pbc_slice* msg) {
   l.login_count++;
   l.vtcp_id = agent->vtcp_id();
   pending_logins2_[agent->uid()] = l;
-  pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_CLIENT, msg);
-  if (!true) {
+  if (!pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_CLIENT, msg)) {
     // 世界id不存在，或者该世界当前处于不可用状态（心跳超时），直接丢弃消息，这时不应该主动断开连接
     LOG(ERROR) << "drop msg for worldId=" << agent->world_id() << ",uid=" << agent->uid();
   }
@@ -1052,14 +1066,14 @@ bool YWServer::processClientLoginMsg(AgentYW* agent, pbc_slice* msg) {
   uint32_t world_id = 0;
   uint64_t login_session = 0;
   {
-    // 这里默认解密是XOR，没压缩。
     uint8_t xor_buffer[64 * 1026] = { 0 };
-    for (int i = 0; i < msg->len; i++) {
-      xor_buffer[i] = static_cast<char*>(msg->buffer)[i] ^ 165;
-    }
     pbc_slice slice;
     slice.buffer = xor_buffer;
-    slice.len = msg->len;
+    slice.len = msg->len - PROTO_HEAD_SIZE;
+    uint8_t* proto_data = static_cast<uint8_t*>(msg->buffer) + PROTO_HEAD_SIZE;
+    for (int i = 0; i < slice.len; i++) {
+      xor_buffer[i] = proto_data[i] ^ 165;
+    }
     pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, kPROTO_C2SLogin, &slice);
     if (rmsg) {
       uint32_t login_session_h = 0;

@@ -44,7 +44,6 @@ namespace TCP_OP {
   //
   static const uint16_t ZMQ_SERVER = 0x0060;
   static const uint16_t ZMQ_CONNECT = 0x0061;
-  static const uint16_t ZMQ_SEND = 0x0062;
   static const uint16_t ZMQ_ACTIVE = 0x0063;
 }
 // -------------------------------------------------------------------------

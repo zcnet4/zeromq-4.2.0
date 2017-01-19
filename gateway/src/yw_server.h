@@ -160,7 +160,7 @@ private:
   @func			: pushMsgToGameServer
   @brief		: 发到游戏服务器。
   */
-  void pushMsgToGameServer(uint32_t world_id, int64_t uid, int32_t type, pbc_slice* data);
+  bool pushMsgToGameServer(uint32_t world_id, int64_t uid, int32_t type, pbc_slice* data);
   /*
   @func			: sendMsgToClient
   @brief		: 发到窗户端。
@@ -233,7 +233,7 @@ private:
     uint64_t m_LoginSessionCreateTime;
     uint64_t swicthWorldSession;
     login_t(uint64_t vtcp_id) {
-      vtcp_id = vtcp_id;
+      this->vtcp_id = vtcp_id;
       world_id = 0;
       m_LoginSession = 0;
       m_LoginSessionCreateTime = 0;
@@ -250,9 +250,11 @@ private:
   struct Game {
     bool m_GameServerStarted;  // gameServer是否启动
     bool m_GameServerActive;
+    uint64_t m_LastBreatheTimestamp;
     Game() {
       m_GameServerStarted = false;
-      m_GameServerActive = false;
+      m_GameServerActive = false; // 初始化时为false,不允许往RecvClientMsgsQueue里添加消息。只有收到网关心跳后才能发消息
+      m_LastBreatheTimestamp = 0;
     }
   };
   typedef std::unordered_map<uint32_t/*world_id*/, Game> games_t;
