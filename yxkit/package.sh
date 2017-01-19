@@ -30,12 +30,12 @@ cp -r ${WORKDIR}/gateway/conf ${DST}
 
 
 # 复制skynet系统脚本
-mkdir ${DST}/skynet
-cp -r ${WORKDIR}/skynet/lualib ${DST}/skynet/lualib
-cp -r ${WORKDIR}/skynet/service ${DST}/skynet/service
+mkdir ${DST}/skynet_script
+cp -r ${WORKDIR}/skynet_script/lualib ${DST}/skynet_script/lualib
+cp -r ${WORKDIR}/skynet_script/service ${DST}/skynet_script/service
 
 # 复制skynet脚本
-cp -r ${WORKDIR}/skynet/yx ${DST}/skynet/yx
+cp -r ${WORKDIR}/skynet_script/yx ${DST}/skynet_script/yx
 
 tar -czf ${DST}.tar.gz ${DST}
 cp ${DST}.tar.gz ${WORKDIR}
