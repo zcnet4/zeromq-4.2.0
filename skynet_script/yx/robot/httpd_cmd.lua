@@ -2,7 +2,9 @@ local skynet = require "skynet"
 local pp = require "util/pprint"
 local dc = require "datacenter"
 local invoke = require "common/invoke"
+local param_mgr = require "robot/param_mgr"
 ----------------------------------------------------------------------------------------
+
 local CMD = {}
 
 local function http_call(session, call_type, cmd, ...)
@@ -33,7 +35,9 @@ function CMD.listGates(h, ...)
 	h:response(dc.get("listGates"))
 end
 
-local function robot_call(i, dst, method, ...)
+local function robot_call(i, dst, query, method, ...)
+	-- pp.print_oneline("2------", i, dst, method, query, ...)
+	-- pp.print(urllib.parse_query(query))
 	skynet.send("/robot/robot"..i, "lua", "Invoke", dst, method, ...)
 end
 
@@ -41,9 +45,30 @@ function CMD.gateway(h, ...)
 	local robot_count = dc.get("robot_count")
 	pp.print(robot_count)
 	for i = 1, robot_count do
-		robot_call(i, "gateway", select(1, ...))
+		robot_call(i, "gateway", h.query, select(1, ...))
 	end
 	h:response("Ok")
+end
+
+function CMD.setparam(h)
+	if h.query then
+    	param_mgr.set_param(h.query)
+    end
+	h:response(param_mgr.get_all_param())
+end
+
+function CMD.getparam(h)
+	h:response(param_mgr.get_all_param())
+end
+
+function CMD.reset(h, ...)
+	print("get CMD.reset command")
+	local robot_count = dc.get("robot_count")
+	for i = 1, robot_count do
+		-- robot_call(i, "gateway", h.query, select(1, ...))
+		skynet.send("/robot/robot"..i, "lua", "Invoke", "gateway", "reset", ...)
+	end
+	h:response("Ok11")
 end
 
 ----------------------------------------------------------------------------------------

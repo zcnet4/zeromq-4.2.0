@@ -2,6 +2,7 @@
 local skynet = require "skynet"
 require "skynet.manager"	-- import manager apis
 local dc = require "datacenter"
+local param_mgr = require "robot/param_mgr"	--参数管理 
 ----------------------------------------------------------------------------------------
 -- 服务名。
 local _console_name 		= "console"
@@ -12,14 +13,17 @@ M._robots = {}
 
 local function base_start()
 	skynet.newservice(_console_name)
+	local harbor2 = require "skynet.harbor2"
 	-- 启动数据中心。
 	local datacenter = skynet.newservice "datacenterd"
 	skynet.name("DATACENTER", datacenter)
+	harbor2.register("/public/datacenter", datacenter)
 	-- 注册robot主服务，方便机器间数据访问。
-	local harbor2 = require "skynet.harbor2"
 	harbor2.register("/robot/main", skynet.self())
 	-- 启动httpd服务容器
 	skynet.newservice(_httpd_name, 7255, "robot/httpd_cmd")
+	--初始化参数
+	param_mgr.init_param();
 end
 
 function M.Init()

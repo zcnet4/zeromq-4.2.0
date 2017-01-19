@@ -36,7 +36,7 @@ function M:connect(addr)
 		skynet.error("socket had connected")
 		return
 	end
-	print("sc2 connect to: " .. addr .. "uid=" .. self.uid)
+	-- print("sc2 connect to: " .. addr .. "uid=" .. self.uid)
 	local host, port = string.match(addr, "([^:]+):(.+)$")
 	self.channel = sc.channel {
 		host = host,
@@ -44,7 +44,7 @@ function M:connect(addr)
 		response = channel_response,
 	}
 	self.channel:connect(true)
-	print("sc2 connect to: " .. addr .. "uid=" .. self.uid .. "!!!!!!!!!!!!end")
+	-- print("sc2 connect to: " .. addr .. "uid=" .. self.uid .. "!!!!!!!!!!!!end")
 
 	math.randomseed(tostring(os.time()):reverse():sub(1, 6)) 
 end
@@ -77,7 +77,7 @@ end
 function M:send(package_size)
 	if self.channel and self.channel:check_connection() then
 		self.session = self.session + 1
-		local data_size = math.random(12,64*1024 - 24 - 24)
+		local data_size = math.random(package_size - 24 - 24)
 		--local data_size = math.random(64*1024 - 100,64*1024 - 24)
 		local N = math.ceil(data_size / 10)
 		local data = string.rep("loveMMbyZC", N)
