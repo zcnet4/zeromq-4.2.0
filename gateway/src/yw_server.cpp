@@ -890,8 +890,9 @@ void YWServer::sendToClientCanSendLogin(uint32_t world_id, uint64_t uid, uint64_
   uint64_t now = time_now();
   login.m_LoginSessionCreateTime = now;
   login.world_id = world_id;
-  login.m_LoginSession = reinterpret_cast<uint64_t>(&login) + rand_r(&static_cast<unsigned>(now));
-  login.swicthWorldSession = reinterpret_cast<uint64_t>(&login) + rand_r(&static_cast<unsigned>(now));
+  unsigned now2 = static_cast<unsigned>(now);
+  login.m_LoginSession = reinterpret_cast<uint64_t>(&login) + rand_r(&now2);
+  login.swicthWorldSession = reinterpret_cast<uint64_t>(&login) + rand_r(&now2);
   //
   pbc_wmessage* wmsg = pbc_wmessage_new(server_pbc_env_, kPROTO_S2CClientCanSendLogin);
   if (wmsg) {
