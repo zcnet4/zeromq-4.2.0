@@ -6,8 +6,8 @@ local P = require "protobuf"
 -- 创建ywc类。
 local YWClient = class("ywc");
 
-P.register_file("D:\\yx_code\\yx\\gateway\\conf\\proto_client.pb");
-P.register_file("D:\\yx_code\\yx\\gateway\\conf\\proto_server.pb");
+P.register_file("yx/mock/proto_client.pb");
+P.register_file("yx/mock/proto_server.pb");
 
 local function NetPack(content)
 	local content_size = string.len(content)
@@ -84,9 +84,13 @@ function YWClient:login(worldid, uid)
 		--
 		local resp1 = self.channel:request(ProtoPack(TOSERVER_LOGIN, c2s_login), ProtoResponse)
 		print(resp1.cmd)
+		if resp1.cmd == 9 then
+			return true
+		end
 	else
 		print("TOSERVER_QUEUE_SERVER_VALIDATE response cmd:", cmd)
 	end	
+	return false
 end
 
 function YWClient:send(content)
