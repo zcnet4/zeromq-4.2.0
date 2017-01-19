@@ -117,7 +117,6 @@ protected:
   @brief		:
   */
   void init_pbc_env() {
-    //
     client_pbc_env_ = pbc_new();
     server_pbc_env_ = pbc_new();
     //
@@ -237,6 +236,7 @@ protected:
       pbc_slice proto_slice;
       uint32_t proto_uid = 0;
       uint32_t world_id = 0;
+      char ok[64] = { 0 };
       pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, "c2s_queue_server_validate", data);
       if (rmsg) {
         proto_uid = pbc_rmessage_integer(rmsg, "id", 0, nullptr);
@@ -244,18 +244,17 @@ protected:
         pbc_rmessage_delete(rmsg);
         //
         if (proto_uid == uid) {
-          proto_slice.buffer = "1";
-          proto_slice.len = sizeof("1");
+          ok[0] = 49;
         } else {
-          proto_slice.buffer = "0";
-          proto_slice.len = sizeof("0");
+          ok[0] = 48;
         }
       } else {
         LOG(ERROR) << "Wrong protocol package. cmd:" << TOSERVER_QUEUE_SERVER_VALIDATE;
-        proto_slice.buffer = "0";
-        proto_slice.len = sizeof("0");
+        ok[0] = 48;
       }
       //
+      proto_slice.buffer = ok;
+      proto_slice.len = strlen(ok);
       SendProto(uid, QMT_QUEUESERVER_RESULT, &proto_slice);
       LOG(WARNING) << "Reply QMT_QUEUESERVER_RESULT world_id:" << world_id << " uid:" << uid;
       return;
