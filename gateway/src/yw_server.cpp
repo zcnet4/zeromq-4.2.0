@@ -24,6 +24,11 @@
 #include "gateway.h"
 #include "yx/packet_view.h"
 #include "yx/allocator.h"
+#include <algorithm>
+#include <cstdlib>
+#ifdef OS_WIN
+#define rand_r(x) rand()
+#endif // OS_WIN
 // -------------------------------------------------------------------------
 //////////////////////////////////////////////////////////////////////////
 // AgentYW
@@ -75,8 +80,8 @@ public:
     YWServer* server_;
   };
 public:
-  uint32_t uid() const { return uid_; }
-  void set_uid(uint32_t uid) { uid_ = uid; }
+  uint64_t uid() const { return uid_; }
+  void set_uid(uint64_t uid) { uid_ = uid; }
   uint32_t world_id() const { return world_id_; }
   void set_world_id(uint32_t world_id) { world_id_ = world_id; }
   uint32_t to_world_id() const { return to_world_id_; }
@@ -84,7 +89,7 @@ public:
   GW_CLIENT_STATUS status() const { return status_; }
   void set_status(GW_CLIENT_STATUS status) { status_ = status; }
 private:
-  uint32_t uid_;
+  uint64_t uid_;
   uint32_t world_id_;
   uint32_t to_world_id_;
   GW_CLIENT_STATUS status_;
@@ -125,10 +130,10 @@ bool YWServer::Start(yx::Loop* loop) {
     return false;
   }
   //
-  if (!initSpawnWorldIdSet()) {
+  /*if (!initSpawnWorldIdSet()) {
     LOG(ERROR) << "YWServer::Initialize failed";
     return false;
-  }
+  }*/
   //
   return true;
 }
@@ -272,24 +277,24 @@ bool YWServer::init_pbc_env() {
 @func			: initSpawnWorldIdSet
 @brief		:
 */
-bool YWServer::initSpawnWorldIdSet() {
-  std::vector<std::string> idStrVector = Config::Instance().getSpawnWorldIds();
-  size_t size = idStrVector.size();
-  LOG(INFO) << "spawn world id num:" << size;
-  for (size_t i = 0; i < size; ++i) {
-    int worldId = atoi(idStrVector[i].c_str());
-    LOG(INFO) << "spawn world id:" << worldId;
-
-    spawn_world_ids_.insert(worldId);
-  }
-
-  if (spawn_world_ids_.size() <= 0) {
-    LOG(ERROR) << "spawn_world_ids config error, check it!";
-    //exit(-1);
-  }
-  //
-  return spawn_world_ids_.size() != 0;
-}
+//bool YWServer::initSpawnWorldIdSet() {
+//  std::vector<std::string> idStrVector = Config::Instance().getSpawnWorldIds();
+//  size_t size = idStrVector.size();
+//  LOG(INFO) << "spawn world id num:" << size;
+//  for (size_t i = 0; i < size; ++i) {
+//    int worldId = atoi(idStrVector[i].c_str());
+//    LOG(INFO) << "spawn world id:" << worldId;
+//
+//    spawn_world_ids_.insert(worldId);
+//  }
+//
+//  if (spawn_world_ids_.size() <= 0) {
+//    LOG(ERROR) << "spawn_world_ids config error, check it!";
+//    //exit(-1);
+//  }
+//  //
+//  return spawn_world_ids_.size() != 0;
+//}
 
 /*
 @func			: Stop
@@ -322,11 +327,11 @@ bool YWServer::check_proto_s2c(int proto_type) {
 }
 
 /*
-@func			: ticks_now
+@func			: time_now
 @brief		:
 */
-uint64_t YWServer::ticks_now() const {
-  return loop_->ticks_now();
+uint64_t YWServer::time_now() const {
+  return loop_->time_now();
 }
 
 /*
@@ -349,47 +354,47 @@ void YWServer::removeAgent(uint64_t vtcp_id) {
 @func			: findSpawnWorldId
 @brief		:
 */
-uint32_t YWServer::findSpawnWorldId() {
-  int spawnWorldId = -1;
-  int minOnlineNum = 99999;
-  for (auto it = spawn_world_ids_.begin(); it != spawn_world_ids_.end(); ++it) {
-    int worldId = *it;
-    auto mapIter = game_server_status_.find(worldId);
-    if (mapIter != game_server_status_.end()) {
-      if ((ticks_now() - mapIter->second.updateTime < 60 || spawnWorldId == -1)
-        && mapIter->second.num < minOnlineNum) {
-        spawnWorldId = worldId;
-        minOnlineNum = mapIter->second.num;
-      }
-    }
-  }
-
-  if (spawnWorldId == -1) {
-    std::stringstream ss;
-    ss << "findSpawnWorldId failed!!, m_spawnWorldIdSet.size:" << spawn_world_ids_.size()
-      << ",m_gameServerStatus.size:" << game_server_status_.size() << ",g_timeNow="
-      << loop_->ticks_now() << "; ";
-
-    for (auto it = spawn_world_ids_.begin(); it != spawn_world_ids_.end(); ++it) {
-      ss << "spawn world id:" << *it << ",";
-    }
-
-    for (auto mapIter = game_server_status_.begin(); mapIter != game_server_status_.end(); ++mapIter) {
-      ss << "game server status, id=" << mapIter->first << ",num=" << mapIter->second.num
-        << ",updateTime=" << mapIter->second.updateTime << "; ";
-    }
-
-    LOG(ERROR) << ss.str();
-  }
-
-  return spawnWorldId;
-}
+//uint32_t YWServer::findSpawnWorldId() {
+//  int spawnWorldId = -1;
+//  int minOnlineNum = 99999;
+//  for (auto it = spawn_world_ids_.begin(); it != spawn_world_ids_.end(); ++it) {
+//    int worldId = *it;
+//    auto mapIter = game_server_status_.find(worldId);
+//    if (mapIter != game_server_status_.end()) {
+//      if ((ticks_now() - mapIter->second.updateTime < 60 || spawnWorldId == -1)
+//        && mapIter->second.num < minOnlineNum) {
+//        spawnWorldId = worldId;
+//        minOnlineNum = mapIter->second.num;
+//      }
+//    }
+//  }
+//
+//  if (spawnWorldId == -1) {
+//    std::stringstream ss;
+//    ss << "findSpawnWorldId failed!!, m_spawnWorldIdSet.size:" << spawn_world_ids_.size()
+//      << ",m_gameServerStatus.size:" << game_server_status_.size() << ",g_timeNow="
+//      << loop_->ticks_now() << "; ";
+//
+//    for (auto it = spawn_world_ids_.begin(); it != spawn_world_ids_.end(); ++it) {
+//      ss << "spawn world id:" << *it << ",";
+//    }
+//
+//    for (auto mapIter = game_server_status_.begin(); mapIter != game_server_status_.end(); ++mapIter) {
+//      ss << "game server status, id=" << mapIter->first << ",num=" << mapIter->second.num
+//        << ",updateTime=" << mapIter->second.updateTime << "; ";
+//    }
+//
+//    LOG(ERROR) << ss.str();
+//  }
+//
+//  return spawnWorldId;
+//}
 
 /*
 @func			: pushMsgToGameServer
 @brief		: 发到游戏服务器。
 */
-void YWServer::pushMsgToGameServer(uint32_t world_id, int32_t uid, int32_t type, pbc_slice* data) {
+void YWServer::pushMsgToGameServer(uint32_t world_id, int64_t uid, int32_t type, pbc_slice* data) {
   yx::Packet packet(buildQueuedMsg(uid, type, data));
   //
   InputToBackend((TCP_OP::YW_M2B), world_id, packet);
@@ -455,7 +460,7 @@ bool YWServer::processGameServerStatus(const uint8_t* buf, uint16_t buf_size) {
     OnlineStatus onlineStatus;
     uint32_t worldId = pbc_rmessage_integer(s2s_online_num, kPROTO_S2SOnlineNumWorldId, 0, nullptr);
     onlineStatus.num = pbc_rmessage_integer(s2s_online_num, kPROTO_S2SOnlineNumOnlineNum, 0, nullptr);
-    onlineStatus.updateTime = ticks_now();
+    onlineStatus.updateTime = time_now();
 
     game_server_status_[worldId] = onlineStatus;
 
@@ -472,10 +477,52 @@ bool YWServer::processGameServerStatus(const uint8_t* buf, uint16_t buf_size) {
 }
 
 /*
+@func			: processQueueServerValidateResult
+@brief		:
+*/
+void YWServer::processQueueServerValidateResult(uint32_t world_id, uint64_t uid, int pass) {
+  auto iter(pending_logins2_.find(uid));
+  if (pending_logins2_.end() != iter) {
+    pending_login& l = iter->second;
+    if (l.login_count > 1) {
+      // 在验证过程中，不止一个客户端发送了排队服务器验证协议，这里只处理最后一个
+      l.login_count--;
+      return;
+    }
+    uint64_t vtcp_id = l.vtcp_id;
+    pending_logins2_.erase(iter);
+    if (pass == 0) {  // 通知新的客户端排队服务器验证失败
+      //DenyAccess(newClient, SERVER_ACCESSDENIED_QUEUE_SERVER_VALIDATE_FAILED);
+    } else {
+      auto it(uid_logineds_.find(uid));
+      if (uid_logineds_.end() != it) {
+        //sendAccessDeniedToClient(oldClient);
+        //askGameToLogout(oldClient->m_CurrWorldId, oldClient->m_Uid, oldClient->m_Status);
+        uid_logineds_.erase(it);
+      }
+      login_t login(vtcp_id);
+      uid_logineds_.emplace(uid_logineds_t::value_type(uid, login));
+      sendToClientCanSendLogin(world_id, uid, vtcp_id);
+    }
+  } else {
+    // 正常客户端的排队验证
+    auto it(uid_logineds_.find(uid));
+    if (uid_logineds_.end() != it) {
+      if (pass == 0) { // 通知客户端排队服务器验证失败
+      //    DenyAccess(client, SERVER_ACCESSDENIED_QUEUE_SERVER_VALIDATE_FAILED);
+      } else {  // 排队服务器验证通过，通知客户端可以发送登录协议
+        sendToClientCanSendLogin(world_id, uid, it->second.vtcp_id);
+      }
+    }
+  }
+}
+
+
+/*
 @func			: processGameMsg
 @brief		:
 */
-bool YWServer::processGameMsg(uint32_t world_id, uint32_t uid, uint32_t type, 
+bool YWServer::processGameMsg(uint32_t world_id, uint64_t uid, uint32_t type,
   const uint8_t* buf, uint16_t buf_size, yx::Packet& packet) {
   bool success = false;
   switch (type) {
@@ -517,6 +564,11 @@ bool YWServer::processGameMsg(uint32_t world_id, uint32_t uid, uint32_t type,
     // 这里不做Xor，GS已做了Xor。by ZC. 2017-1-18 20:13.
     sendRawMsgToAllClient(world_id, packet);
   } break;
+  case QMT_QUEUESERVER_RESULT: {
+    char string_buf[128] = { 0 };
+    memcpy(string_buf, buf, std::min<uint16_t>(buf_size, 128));
+    processQueueServerValidateResult(world_id, uid, atoi(string_buf));
+  } break;
   default:
     LOG(ERROR) << "Gateway recv msg from game server, unknown type:" << type;
     break;
@@ -550,12 +602,10 @@ void YWServer::onPlayerSaved(AgentYW* agent) {
 }
 
 void YWServer::onPlayerSavedBeingKicked(AgentYW* agent) {
-  processPendingLogin(agent, true);
   CloseAgent(agent->vtcp_id());
 }
 
 void YWServer::onPlayerSavedLoggingOut(AgentYW* agent) {
-  processPendingLogin(agent, false);
   CloseAgent(agent->vtcp_id());
 }
 
@@ -563,7 +613,7 @@ void YWServer::onPlayerSavedSwitchingWorld(AgentYW* agent) {
   LOG(INFO) << "user " << agent->uid() << " switch world succ, from " << agent->world_id()
     << " to " << agent->to_world_id();
   //
-  askGameServerToAddPeer(agent->to_world_id(), agent->uid(), nullptr);
+  //askGameServerToAddPeer(agent->to_world_id(), agent->uid(), nullptr);
   sendSwitchWorldAckToClient(agent, 0);
 
   agent->set_world_id(agent->to_world_id());
@@ -594,10 +644,10 @@ void YWServer::sendSwitchWorldAckToClient(AgentYW* agent, int result) {
 @func			: buildQueuedMsg
 @brief		:
 */
-yx::Packet YWServer::buildQueuedMsg(int32_t uid, int32_t type, pbc_slice* data) {
+yx::Packet YWServer::buildQueuedMsg(int64_t uid, int32_t type, pbc_slice* data) {
   pbc_wmessage* queued_msg = pbc_wmessage_new(server_pbc_env_, kPROTO_QueuedMsg);
   if (queued_msg) {
-    pbc_wmessage_integer(queued_msg, kPROTO_QueuedMsgUid, uid, 0);
+    pbc_wmessage_integer(queued_msg, kPROTO_QueuedMsgUid, static_cast<int32_t>(uid), 0);
     pbc_wmessage_integer(queued_msg, kPROTO_QueuedMsgType, type, 0);
     if (data)
       pbc_wmessage_string(queued_msg, kPROTO_QueuedMsgData, (const char*)data->buffer, data->len);
@@ -619,7 +669,7 @@ yx::Packet YWServer::buildQueuedMsg(int32_t uid, int32_t type, pbc_slice* data) 
 @func			: decodeClientMsg
 @brief		: 返回服务端命令，参数返回原始数据内容。
 */
-bool YWServer::decodeClientMsg(uint32_t uid, yx::Packet& packet, uint16_t& msgType, pbc_slice* slice) {
+bool YWServer::decodeClientMsg(uint64_t uid, yx::Packet& packet, uint16_t& msgType, pbc_slice* slice) {
   uint8_t* pp = const_cast<uint8_t*>(packet.buf() + packet.offset());
   int pp_size = packet.buf_size() - packet.offset();
 //  通信协议头
@@ -638,7 +688,7 @@ bool YWServer::decodeClientMsg(uint32_t uid, yx::Packet& packet, uint16_t& msgTy
   uint8_t v0 = *pp;
   uint8_t v1 = *(pp + 1);
   msgType = ((v1 >> 6) << 8) | v0;
-  if (v1 & 0x3F != 0x02) {
+  if ((v1 & 0x3F) != 0x02) {
     return false;
   }
   pp_size -= (PROTO_HEAD_SIZE - 2);
@@ -706,17 +756,33 @@ bool YWServer::processClientMsg(Agent* a, yx::Packet& packet) {
   }  
   //　是否已登录。
   if (!agent->auth()) {
+    // 处理排队服务器协议
+    if (proto_type == TOSERVER_QUEUE_SERVER_VALIDATE) {
+      if (processQueueServerMsg(agent, &slice)) {
+        return true;
+      } else {
+        // delete agent
+        agent->set_status(AgentYW::GW_CLIENT_STATUS_DISCONNECT);
+        return false;
+      }
+    }
+    // 处理登录协议
+    if (proto_type == TOSERVER_LOGIN) {
+      bool login_success = processClientLoginMsg(agent, &slice);
+      if (login_success) {
+        agent->set_auth(true);
+        return true;
+      } else {
+        // delete agent
+        agent->set_status(AgentYW::GW_CLIENT_STATUS_DISCONNECT);
+        return false;
+      }
+    }
     // Client连接成功后，发送过来的第一条协议不是登录协议，踢掉Client
     if (proto_type != TOSERVER_QUEUE_SERVER_VALIDATE) {
       LOG(ERROR) << "client first protocol is not LOGIN, remove it :" << proto_type;
       askGameToLogout(agent);
       return false;
-    }
-    if (true/*parseLoginMsg(agent, pmsg)*/) {
-      processLogin(agent, &slice);
-    } else {
-      // delete agent
-      agent->set_status(AgentYW::GW_CLIENT_STATUS_DISCONNECT);
     }
   } else {
     if (agent->status() != AgentYW::GW_CLIENT_STATUS_NORMAL) {
@@ -728,163 +794,6 @@ bool YWServer::processClientMsg(Agent* a, yx::Packet& packet) {
   }
   //
   return true;
-}
-
-/*
-@func			: parseLoginMsg
-@brief		:
-*/
-bool YWServer::parseLoginMsg(AgentYW* agent, pbc_rmessage* pmsg) {
-  bool success = false;
-  pbc_slice slice;
-  slice.buffer = (void*)pbc_rmessage_string(pmsg, kPROTO_MessageMsgData, 0, &slice.len);
-  //
-  pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, kPROTO_C2SLogin, &slice);
-  if (rmsg) {
-    agent->set_uid(pbc_rmessage_integer(rmsg, kPROTO_C2SLoginUid, 0, nullptr));
-    agent->set_world_id(pbc_rmessage_integer(rmsg, kPROTO_C2SLoginWorldId, 0, nullptr));
-    if (0 == agent->world_id()) {
-      agent->set_world_id(findSpawnWorldId());
-    }
-    LOG(INFO) << "getUidWorldIdFromLoginMsg, uid:" << agent->uid() << ",worldId:" << agent->world_id();
-    if (-1 == agent->world_id()) {
-      LOG(ERROR) << "can not get uid and worldId, begin to close the connection";
-    } else {
-      success = true;
-    }
-  } else {
-    LOG(ERROR) << "Gateway parse c2s_login fail, check it now!!!";
-  }
-  //
-  pbc_rmessage_delete(rmsg);
-  //
-  return success;
-}
-
-/*
-@func			: ProcessLogin
-@brief		:
-*/
-bool YWServer::processLogin(AgentYW* agent, pbc_slice* login_msg) {
-  uint32_t uid = agent->uid();
-  logined_list_t::iterator iter(logined_list_.find(uid));
-  if (logined_list_.end() == iter) {
-    logined_list_.emplace(logined_list_t::value_type(uid, agent->vtcp_id()));
-    agent->set_auth(true);
-    askGameServerToAddPeer(agent->world_id(), uid, login_msg);
-    return true;
-  }
-  // 处理重复登录的用户。
-  AgentYW* old_user = (AgentYW*)GetAgent(iter->second);
-  if (!old_user) {
-    logined_list_[uid] = agent->vtcp_id();
-    agent->set_auth(true);
-    askGameServerToAddPeer(agent->world_id(), uid, login_msg);
-    return true;
-  }
-
-  LOG(INFO) << "same uid client login, uid:" << uid
-    << ", old fd:" << old_user->vtcp_id() << ", new fd:" << agent->vtcp_id()
-    << ", original new client fd:" << 0
-    << ", old client status:" << old_user->status();
-  //
-  if (old_user->status() == AgentYW::GW_CLIENT_STATUS_BEING_KICKED) {
-    /*
-    * 已经有一个新的客户端想踢掉这个客户端，并且还未完成
-    */
-    auto range = pending_logins_.equal_range(uid);
-    for (; range.second != range.first; ++ range.first) {
-      pending_login& pl = range.first->second;
-      AgentYW* a = static_cast<AgentYW*>(GetAgent(pl.vtcp_id));
-      if (a && a->status() == AgentYW::GW_CLIENT_STATUS_NORMAL) {
-        a->set_status(AgentYW::GW_CLIENT_STATUS_BEING_KICKED);
-        sendAccessDeniedToClient(a);
-      }
-    } // for
-    pending_login pl(login_msg->len, agent->vtcp_id());
-    memcpy(pl.loging_msg.get(), login_msg->buffer, login_msg->len);
-    pending_logins_.emplace(uid, std::move(pl));
-    return true;
-
-  } else if (old_user->status() == AgentYW::GW_CLIENT_STATUS_LOGGING_OUT) {
-    auto range = pending_logins_.equal_range(uid);
-    for (; range.second != range.first; ++range.first) {
-      pending_login& pl = range.first->second;
-      AgentYW* a = static_cast<AgentYW*>(GetAgent(pl.vtcp_id));
-      if (a && a->status() == AgentYW::GW_CLIENT_STATUS_NORMAL) {
-        a->set_status(AgentYW::GW_CLIENT_STATUS_BEING_KICKED);
-        sendAccessDeniedToClient(a);
-      }
-    } // for
-    pending_login pl(login_msg->len, agent->vtcp_id());
-    memcpy(pl.loging_msg.get(), login_msg->buffer, login_msg->len);
-    pending_logins_.emplace(uid, std::move(pl));
-    return true;
-  } else {
-    // old client 属于正常状态
-    sendAccessDeniedToClient(old_user);
-    askGameToLogout(old_user);
-    old_user->set_status(AgentYW::GW_CLIENT_STATUS_BEING_KICKED);
-    pending_login pl(login_msg->len, agent->vtcp_id());
-    memcpy(pl.loging_msg.get(), login_msg->buffer, login_msg->len);
-    pending_logins_.emplace(uid, std::move(pl));
-    return true;
-  }
-  return true;
-}
-
-/*
-@func			: processPendingLogin
-@brief		:
-*/
-void YWServer::processPendingLogin(AgentYW* agent, bool kick) {
-  uint32_t uid = agent->uid();
-  // removeClient, 删除已登录列表。
-  auto iter(logined_list_.find(uid));
-  if (logined_list_.end() != iter)
-    logined_list_.erase(iter);
-  //
-  pending_login* pending = nullptr; {
-    // 只取出最后一个做登录。
-    auto range = pending_logins_.equal_range(uid);
-    for (; range.second != range.first; ++range.first) {
-      pending = &(range.first->second);
-    }
-  }
-  AgentYW* agent_new = pending ? static_cast<AgentYW*>(GetAgent(pending->vtcp_id)) : nullptr;
-  if (agent_new) {
-    if (kick) {
-      LOG(INFO) << "client of uid: " << uid << ",fd:" << agent->vtcp_id() << " kicked,"
-        << "new fd:" << agent_new->vtcp_id();
-    } else {
-      LOG(INFO) << "client of uid: " << uid << ",fd:" << agent->vtcp_id() << " logging out,"
-        << "new fd:" << agent_new->vtcp_id();
-    }
-    pbc_slice login_msg;
-    login_msg.buffer = pending->loging_msg.get();
-    login_msg.len = pending->loging_msg_len;
-    processLogin(agent_new, &login_msg);
-  }
-  else {
-    if (kick) {
-      LOG(ERROR) << "kicking client, new client of new fd is NULL";
-    }
-  }
-  //
-  pending_logins_.erase(uid);
-}
-
-/*
-@func			: askGameServerToAddPeer
-@brief		: 
-*/
-void YWServer::askGameServerToAddPeer(uint32_t world_id, uint32_t uid, pbc_slice* login_msg/* = nullptr*/) {
-  //pushMsgToGameServer(world_id, uid, QMT_ADD_PEER, nullptr);
-  LOG(INFO) << "send add peer msg to game server,uid:" << uid;
-  if (login_msg) {
-    // 并将登录消息转发到Game Server中。
-    pushMsgToGameServer(world_id, uid, QMT_GAME, login_msg);
-  }
 }
 
 /*
@@ -957,16 +866,45 @@ void YWServer::sendAccessDeniedToClient(YWServer::AgentYW* client) {
   LOG(INFO) << "sendAccessDeniedToClient, uid:" << client->uid() << ",fd:" << client->vtcp_id();
 }
 
+/*
+@func			: sendToClientCanSendLogin
+@brief		:
+*/
+void YWServer::sendToClientCanSendLogin(uint32_t world_id, uint64_t uid, uint64_t vtcp_id) {
+  auto iter(uid_logineds_.find(uid));
+  if (uid_logineds_.end() == iter) return;
+  //
+  login_t& login = iter->second;
+  uint64_t now = time_now();
+  login.m_LoginSessionCreateTime = now;
+  login.world_id = world_id;
+  login.m_LoginSession = reinterpret_cast<uint64_t>(&login) + rand_r(&now);
+  login.swicthWorldSession = reinterpret_cast<uint64_t>(&login) + rand_r(&now);
+  //
+  pbc_wmessage* wmsg = pbc_wmessage_new(server_pbc_env_, kPROTO_S2CClientCanSendLogin);
+  if (wmsg) {
+    pbc_wmessage_integer(wmsg, kPROTO_S2CClientCanSendLoginWorldId, login.world_id, 0);
+    pbc_wmessage_integer(wmsg, kPROTO_S2CClientCanSendLoginLoginSession, login.m_LoginSession & 0x0FFFFFFFF, login.m_LoginSession >> 32);
+    pbc_wmessage_integer(wmsg, kPROTO_S2CClientCanSendLoginSwitchWorldSession, login.m_LoginSession & 0x0FFFFFFFF, login.m_LoginSession >> 32);
+    //
+    pbc_slice serialize_slice;
+    pbc_wmessage_buffer(wmsg, &serialize_slice);
+    sendMsgToClient(nullptr, TOCLIENT_CAN_SEND_LOGIN, &serialize_slice);
+    //
+    pbc_wmessage_delete(wmsg);
+  }
+}
+
 
 /*
 @func			: GetAgentFromUid
 @brief		:
 */
-YWServer::AgentYW* YWServer::GetAgentFromUid(uint32_t uid) {
-  logined_list_t::iterator iter(logined_list_.find(uid));
-  if (logined_list_.end() != iter) {
-    uint64_t& vtcp_id = iter->second;
-    return static_cast<AgentYW*>(GetAgent(vtcp_id));
+YWServer::AgentYW* YWServer::GetAgentFromUid(uint64_t uid) {
+  uid_logineds_t::iterator iter(uid_logineds_.find(uid));
+  if (uid_logineds_.end() != iter) {
+    uid_logineds_t::mapped_type& l = iter->second;
+    return static_cast<AgentYW*>(GetAgent(l.vtcp_id));
   }
   //
   LOG(ERROR) << "can not find client by uid " << uid;
@@ -1011,5 +949,158 @@ void YWServer::quitClientsByWorldId(uint32_t world_id) {
     CloseAgent(*iter);
   }
 }
+
+/*
+@func			: processQueueServerMsg
+@brief		:
+*/
+bool YWServer::processQueueServerMsg(YWServer::AgentYW* agent, pbc_slice* msg) {
+  //
+  {
+    // 这里默认解密是XOR，没压缩。
+    uint8_t xor_buffer[64 * 1026] = { 0 };
+    for (int i = 0; i < msg->len; i++) {
+      xor_buffer[i] = static_cast<char*>(msg->buffer)[i] ^ 165;
+    }
+    pbc_slice slice;
+    slice.buffer = xor_buffer;
+    slice.len = msg->len;
+    pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, kPROTO_C2SQueueServerValidate, &slice);
+    if (rmsg) {
+      uint32_t uid_h = 0;
+      uint32_t uid_l = pbc_rmessage_integer(rmsg, kPROTO_C2SQueueServerValidateId, 0, &uid_h);
+      //uint64_t uid = (uint64_t)uid_h << 32 | uid_l;
+      agent->set_uid((uint64_t)uid_h << 32 | uid_l);
+      agent->set_world_id(pbc_rmessage_integer(rmsg, kPROTO_C2SQueueServerValidateWorldId, 0, nullptr));
+      pbc_rmessage_delete(rmsg);
+    } else {
+      return false;
+    }
+  }
+  //
+  auto iter(games_.find(agent->world_id()));
+  if (games_.end() == iter) {
+    // 客户端尝试进入不存在的世界，直接踢掉客户端
+    return false;
+  }
+  Game& g = iter->second;
+  if (!g.m_GameServerActive) {
+    // 客户端进入不可用的世界，发送协议告诉客户端应该下线
+    //DenyAccess(client, SERVER_ACCESSDENIED_GAMESERVER_INACTIVE);
+    return false;
+  }
+  //
+  AgentYW* old_client = GetAgentFromUid(agent->uid());
+  if (!old_client) {
+    /**
+    * 玩家第一次发送登录协议包, 继续正常登录流程
+    */
+    /**
+    * 找不到之前登录的client, 依然继续正常登录流程
+    */
+    login_t login(agent->vtcp_id());
+    uid_logineds_.emplace(uid_logineds_t::value_type(agent->uid(), login));
+    LOG(INFO) << "user first login, send init legacy msg to game, uid:" << agent->uid()
+      << ", fd:" << agent->vtcp_id();
+    pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_CLIENT, msg);
+    return true;
+  }
+  // 已经有相同账号的客户端在线，准备把老的踢下线
+  if (old_client->world_id() != agent->world_id()) {
+    // 新的排队服务器验证协议，尝试在其他世界进行验证，非法操作
+    return false;
+  }
+  /**
+  * 执行到这里，表明当前已经有一个该uid对应的连接，
+  * 该连接可能是客户端断开了还未来得及清理，或者玩家多个手机端登录
+  */
+  LOG(INFO) << "same uid client login, uid:" << agent->uid()
+    << ", old fd:" << old_client->vtcp_id() << ", new fd:" << agent->vtcp_id()
+    //<< ", original new client fd:" << oldClient->m_NewFd
+    << ", old client status:" << old_client->status();
+
+  pending_login l;
+  /* 如果老的客户端处m_NewFd为－1，踢掉其他尝试登录的客户端*/
+  auto it(pending_logins2_.find(agent->uid()));
+  if (pending_logins2_.end() != it) {
+    //  GWRemoteClient* originalNewClient = getClientByFd(oldClient->m_NewFd);
+    //  if (originalNewClient != NULL) {  // 踢掉其他尝试登录的客户端
+    //    originalNewClient->m_Status = GW_CLIENT_STATUS_LOGGING_OUT;
+    //    sendAccessDeniedToClient(originalNewClient);
+    //  }
+    l = it->second;
+  } else {
+    l.login_count = 0;
+  }
+  // 在验证过程中，不止一个客户端发送了排队服务器验证协议，这里只处理最后一个
+  l.login_count++;
+  l.vtcp_id = agent->vtcp_id();
+  pending_logins2_[agent->uid()] = l;
+  pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_CLIENT, msg);
+  if (!true) {
+    // 世界id不存在，或者该世界当前处于不可用状态（心跳超时），直接丢弃消息，这时不应该主动断开连接
+    LOG(ERROR) << "drop msg for worldId=" << agent->world_id() << ",uid=" << agent->uid();
+  }
+  return true;
+}
+
+/*
+@func			: processClientLoginMsg
+@brief		:
+*/
+bool YWServer::processClientLoginMsg(AgentYW* agent, pbc_slice* msg) {
+  uint32_t world_id = 0;
+  uint64_t login_session = 0;
+  {
+    // 这里默认解密是XOR，没压缩。
+    uint8_t xor_buffer[64 * 1026] = { 0 };
+    for (int i = 0; i < msg->len; i++) {
+      xor_buffer[i] = static_cast<char*>(msg->buffer)[i] ^ 165;
+    }
+    pbc_slice slice;
+    slice.buffer = xor_buffer;
+    slice.len = msg->len;
+    pbc_rmessage* rmsg = pbc_rmessage_new(client_pbc_env_, kPROTO_C2SLogin, &slice);
+    if (rmsg) {
+      uint32_t login_session_h = 0;
+      uint32_t login_session_l = pbc_rmessage_integer(rmsg, kPROTO_C2SLoginLoginSession, 0, &login_session_h);
+      login_session = (uint64_t)login_session_h << 32 | login_session_l;
+      world_id = pbc_rmessage_integer(rmsg, kPROTO_C2SLoginWorldId, 0, nullptr);
+      pbc_rmessage_delete(rmsg);
+    } else {
+      return false;
+    }
+  }
+  //
+  auto iter = uid_logineds_.find(agent->uid());
+  if (uid_logineds_.end() == iter) {
+    LOG(ERROR) << "gateway can not find LoginInfo, uid= " << agent->uid();
+    return false;
+  }
+  login_t& login = iter->second;
+  if (login.m_LoginSession != login_session) {
+    // (1) session校验失败，踢掉客户端
+    LOG(ERROR) << "login session error, uid:" << agent->uid();
+    //toRemoveClient = true;
+    return false;
+  } else if ((time_now() - login.m_LoginSessionCreateTime) > 10 * 1000/*10s*/) {
+    // (2) session超时，踢掉客户端
+    LOG(ERROR) << "login session expired, uid:" << agent->uid();
+    return false;
+  } else if (login.world_id != world_id) {
+    // (3) 客户端要进入的世界与网关允许进入的世界id不一致，踢掉客户端
+    LOG(ERROR) << "login worldid error, gateway worldid:" << login.world_id
+      << ", login worldid:" << world_id << ", uid:" << agent->uid();
+    return false;
+  } else {
+    login.m_LoginSession = 0;
+    login.m_LoginSessionCreateTime = 0;
+    pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_CLIENT, msg);
+    return true;  // 登录协议校验通过，可以向gameserver转发登录协议
+  }
+  //
+  return false;
+}
+
 
 // -------------------------------------------------------------------------

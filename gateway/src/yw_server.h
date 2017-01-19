@@ -63,21 +63,21 @@ public:
   */
   bool check_proto_s2c(int proto_type);
   /*
-  @func			: findSpawnWorldId
-  @brief		: 
-  */
-  uint32_t findSpawnWorldId();
-  /*
   @func			: processGameMsg
   @brief		: 
   */
-  bool processGameMsg(uint32_t world_id, uint32_t uid, uint32_t type, 
+  bool processGameMsg(uint32_t world_id, uint64_t uid, uint32_t type, 
     const uint8_t* buf, uint16_t buf_size, yx::Packet& packet);
   /*
   @func			: processGameServerStatus
   @brief		: 
   */
   bool processGameServerStatus(const uint8_t* buf, uint16_t buf_size);
+  /*
+  @func			: processQueueServerValidateResult
+  @brief		: 
+  */
+  void processQueueServerValidateResult(uint32_t world_id, uint64_t uid, int pass);
   /*
   @func			: removeAgent
   @brief		: 
@@ -108,17 +108,22 @@ private:
   @func			: initSpawnWorldIdSet
   @brief		: 
   */
-  bool initSpawnWorldIdSet();
+  //bool initSpawnWorldIdSet();
+  /*
+  @func			: findSpawnWorldId
+  @brief		:
+  */
+  //uint32_t findSpawnWorldId();
   /*
   @func			: decodeClientMsg
   @brief		: 返回服务端命令，参数返回原始数据内容。
   */
-  bool decodeClientMsg(uint32_t uid, yx::Packet& packet, uint16_t& msgType, pbc_slice* slice);
+  bool decodeClientMsg(uint64_t uid, yx::Packet& packet, uint16_t& msgType, pbc_slice* slice);
   /*
-  @func			: ticks_now
+  @func			: time_now
   @brief		: 
   */
-  uint64_t ticks_now() const;
+  uint64_t time_now() const;
   /*
   @func			: quitClientsByWorldId
   @brief		: 
@@ -135,37 +140,27 @@ private:
   @func			: GetAgentFromUid
   @brief		: 
   */
-  AgentYW* GetAgentFromUid(uint32_t uid);
+  AgentYW* GetAgentFromUid(uint64_t uid);
   /*
-  @func			: ProcessLogin
+  @func			: processQueueServerMsg
   @brief		:
   */
-  bool processLogin(AgentYW* agent, pbc_slice* login_msg);
+  bool processQueueServerMsg(AgentYW* agent, pbc_slice* msg);
   /*
-  @func			: parseLoginMsg
-  @brief		:
+  @func			: processClientLoginMsg
+  @brief		: 
   */
-  bool parseLoginMsg(AgentYW* agent, pbc_rmessage* pmsg);
-  /*
-  @func			: processPendingLogin
-  @brief		:
-  */
-  void processPendingLogin(AgentYW* agent, bool kick);
+  bool processClientLoginMsg(AgentYW* agent, pbc_slice* msg);
   /*
   @func			: askGameToLogout
   @brief		: 
   */
   void askGameToLogout(AgentYW* agent);
   /*
-  @func			: askGameServerToAddPeer
-  @brief		: 
-  */
-  void askGameServerToAddPeer(uint32_t world_id, uint32_t uid, pbc_slice* login_msg = nullptr);
-  /*
   @func			: pushMsgToGameServer
   @brief		: 发到游戏服务器。
   */
-  void pushMsgToGameServer(uint32_t world_id, int32_t uid, int32_t type, pbc_slice* data);
+  void pushMsgToGameServer(uint32_t world_id, int64_t uid, int32_t type, pbc_slice* data);
   /*
   @func			: sendMsgToClient
   @brief		: 发到窗户端。
@@ -187,6 +182,11 @@ private:
   */
   void sendAccessDeniedToClient(AgentYW* client);
   /*
+  @func			: sendToClientCanSendLogin
+  @brief		: 
+  */
+  void sendToClientCanSendLogin(uint32_t world_id, uint64_t uid, uint64_t vtcp_id);
+  /*
   @func			: onPlayerSaved
   @brief		: 
   */
@@ -203,7 +203,7 @@ private:
   @func			: buildQueuedMsg
   @brief		:
   */
-  yx::Packet buildQueuedMsg(int32_t uid, int32_t type, pbc_slice* data);
+  yx::Packet buildQueuedMsg(int64_t uid, int32_t type, pbc_slice* data);
   /*
   @func			: buildClientMsg
   @brief		:
@@ -216,8 +216,8 @@ private:
   protos_t proto_s2c_;
   pbc_env* client_pbc_env_;
   pbc_env* server_pbc_env_;
-  typedef std::set<uint32_t> spawn_world_ids_t;
-  spawn_world_ids_t spawn_world_ids_;
+  //typedef std::set<uint32_t> spawn_world_ids_t;
+  //spawn_world_ids_t spawn_world_ids_;
   struct OnlineStatus {
     int num;
     uint64_t updateTime;
@@ -226,25 +226,37 @@ private:
   game_server_status_t game_server_status_;
 private:
   // 已登录列表。
-  typedef std::map<uint32_t/*uid*/, uint64_t/*vtcp_id*/> logined_list_t;
-  logined_list_t logined_list_;
-  struct pending_login {
-    int loging_msg_len;
-    std::unique_ptr<char[]> loging_msg;
+  struct login_t {
+    uint32_t world_id;
     uint64_t vtcp_id;
-    pending_login(int len, uint64_t id)
-      : loging_msg_len(len)
-      , loging_msg(new char[len])
-      , vtcp_id(id)
-    {}
-    pending_login(pending_login&& src) {
-      loging_msg_len = src.loging_msg_len;
-      loging_msg = std::move(src.loging_msg);
-      vtcp_id = src.vtcp_id;
+    uint64_t m_LoginSession;
+    uint64_t m_LoginSessionCreateTime;
+    uint64_t swicthWorldSession;
+    login_t(uint64_t vtcp_id) {
+      vtcp_id = vtcp_id;
+      world_id = 0;
+      m_LoginSession = 0;
+      m_LoginSessionCreateTime = 0;
     }
   };
-  typedef std::multimap<uint32_t/*uid*/, pending_login> pending_logins_t;
-  pending_logins_t pending_logins_;
+  typedef std::map<uint64_t/*uid*/, login_t> uid_logineds_t;
+  uid_logineds_t uid_logineds_;
+  struct pending_login {
+    uint64_t vtcp_id;
+    int      login_count;
+  };
+  typedef std::map<uint64_t/*uid*/, pending_login> pending_logins2_t;
+  pending_logins2_t pending_logins2_;
+  struct Game {
+    bool m_GameServerStarted;  // gameServer是否启动
+    bool m_GameServerActive;
+    Game() {
+      m_GameServerStarted = false;
+      m_GameServerActive = false;
+    }
+  };
+  typedef std::unordered_map<uint32_t/*world_id*/, Game> games_t;
+  games_t games_;
 };
 
 

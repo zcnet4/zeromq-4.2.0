@@ -21,7 +21,7 @@
 class ZmqServer::Zmq 
 {
 public:
-  Zmq(void* zmq_ctx, uint64_t zmq_id)
+  Zmq(void* zmq_ctx, uint32_t zmq_id)
     : zmq_id_(zmq_id)
   {
     // http://www.cnblogs.com/fengbohello/p/4354989.html
@@ -88,11 +88,11 @@ public:
     }
     return true;
   }
-  uint64_t zmq_id() const {
+  uint32_t zmq_id() const {
     return zmq_id_;
   }
 private:
-  uint64_t zmq_id_;
+  uint32_t zmq_id_;
   void* zmq_socket_;
   friend class ZmqServer;
 #ifdef _DEBUG
@@ -321,12 +321,11 @@ bool ZmqServer::Recv(ZmqServer::Zmq* z) {
         int data_size = 0;
         const char* data = pbc_rmessage_string(queued_msg, kPROTO_QueuedMsgData, 0, &data_size);
         //
-        yx::Packet packet(sizeof(uint32_t) + sizeof(uint32_t) + data_size);
-        uint8_t* buf = yx::_write_u32(packet.mutable_buf(), uid);
+        yx::Packet packet(sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + data_size);
+        uint8_t* buf = yx::_write_u32(packet.mutable_buf(), z->zmq_id());
+        buf = yx::_write_u32(buf, uid);
         buf = yx::_write_u32(buf, type);
         memcpy(buf, data, data_size);
-        // ²ÉÓÃpacket param¼ÇÂ¼world_id¡£by ZC. 2017-1-18 20:44.
-        packet.set_param(z->zmq_id());
         //
         InputToMain(op_type_, z->zmq_id(), packet);
         if (QMT_GAME_BREATHE == type) {

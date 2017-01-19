@@ -104,11 +104,11 @@ void MainProcessor::ProcessTcpInput(uint16_t op, uint64_t id, yx::Packet& packet
   case TCP_OP::YW_B2M: {
 #ifdef YX_YW
     const uint8_t* buf = packet.buf();
-    uint32_t uid = 0, type = 0;
+    uint32_t world_id = 0, uid = 0, type = 0;
+    buf = yx::_read_u32(buf, &world_id);
     buf = yx::_read_u32(buf, &uid);
     buf = yx::_read_u32(buf, &type);
     uint16_t buf_size = packet.buf_size() - (buf - packet.buf());
-    uint32_t world_id = static_cast<uint32_t>(packet.param());
     yw_server_->processGameMsg(world_id, uid, type, buf, buf_size, packet);
 #endif // YX_YW
   } break;
