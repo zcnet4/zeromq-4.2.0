@@ -26,7 +26,7 @@ public:
   @func			: generate
   @brief		:
   */
-  uint64_t generate(uint64_t now_time);
+  uint64_t generate(uint64_t now_time, bool& adjust_time);
   //
   void set_machine_id(uint8_t machine_id);
   uint8_t machine_id() const;

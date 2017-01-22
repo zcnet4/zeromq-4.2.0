@@ -293,7 +293,7 @@ void Tcp::on_write_cb(uv_write_t* req, int status) {
   LoopImpl::free_uv_req(req);
   // 如果写失败，则关闭Close。
   if (status != 0) {
-    LOG(ERROR) << "Tcp write error:" << status;
+    LOG(ERROR) << "Tcp write error:" << uv_err_name(status) << "-" << uv_strerror(status);
     Tcp* tcp = reinterpret_cast<Tcp*>(req->handle->data);
     LOG(ERROR) << "Tcp write failure is turned off. tcp_id:" << tcp->tcp_id();
     tcp->Close();

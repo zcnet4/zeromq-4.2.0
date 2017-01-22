@@ -49,7 +49,7 @@ uint8_t IDAllocator::ExtractWorkerId(uint64_t id) {
 @func			: generate
 @brief		:
 */
-uint64_t IDAllocator::generate(uint64_t now_time) {
+uint64_t IDAllocator::generate(uint64_t now_time, bool& adjust_time) {
   // twitter snowflake算法(改进)
   // 64       63----------23--------13-------5-------0
   // 符号位   |  40位时间   |10位自增码|8位机器码|5位内部码|
@@ -61,6 +61,7 @@ uint64_t IDAllocator::generate(uint64_t now_time) {
   40位时间可以用34.8年。
   */
   int64_t new_id = 0;
+  adjust_time = false;
 restart:
   uint64_t time = 0;
   if (now_time > last_time_) {
@@ -71,6 +72,7 @@ restart:
     if (sequence_ >= 0x400) {
       sequence_ = 0;
       now_time++;
+      adjust_time = true;
       goto restart;
     }
     // 中间10位是sequenceID
@@ -79,6 +81,7 @@ restart:
   } else {
     // if (last_time_ > now_time) 
     now_time++;
+    adjust_time = true;
     goto restart;
   }
   // 保留后40位时间

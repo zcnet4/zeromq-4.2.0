@@ -228,7 +228,8 @@ uint64_t FrontendProcessor::OpenVTcpId(uint64_t forward_id, bool auto_create/* =
   uint64_t vtcp_id = 0;
 
   if (auto_create) {
-    vtcp_id = vtcpid_allocator_.generate(loop()->time_now());
+    bool adjust_time = false;
+    vtcp_id = vtcpid_allocator_.generate(loop()->time_now(), adjust_time);
     forward_ids_.emplace(id2id_t::value_type(forward_id, vtcp_id));
     vtcp_ids_.emplace(id2id_t::value_type(vtcp_id, forward_id));
   }

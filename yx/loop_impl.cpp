@@ -247,7 +247,12 @@ void LoopImpl::Unregister(uint64_t id) {
 @brief		: 分配文件描述符。
 */
 uint64_t LoopImpl::alloc_fd() {
-  return fd_allocator_.generate(time_now());
+  bool adjust_time = false;
+  uint64_t fd_id = fd_allocator_.generate(time_now(), adjust_time);
+  if (UNLIKELY(adjust_time)) {
+    time_refresh();
+  }
+  return fd_id;
 }
 
 /*
