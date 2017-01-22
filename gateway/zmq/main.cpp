@@ -76,6 +76,14 @@ private:
 #include "yx/yx_util.h"
 #include "yx/yx_stl_util.h"
 #include "build/compiler_specific.h"
+#define PROTO_HEAD_SIZE 4
+inline void _write_proto_cmd(uint8_t* buf, int type)  {
+  buf[0] = type & 0xff;
+  buf[1] = 0;
+  buf[1] |= ((type >> 8) << 6);
+  uint8_t encryptType = 1;
+  buf[1] |= (encryptType << 1);
+}
 //////////////////////////////////////////////////////////////////////////
 class ZmqServer
 {
@@ -93,7 +101,7 @@ public:
     init_pbc_env();
     // http://www.cnblogs.com/fengbohello/p/4354989.html
     zmq_socket_ = zmq_socket(zmq_ctx_, ZMQ_PAIR);
-    zmq_bind(zmq_socket_, host && *host ? host : "tcp://127.0.0.1:5555");
+    zmq_bind(zmq_socket_, host && *host ? host : "tcp://0.0.0.0:31001");
     return true;
   }
   void Run() {
@@ -270,12 +278,7 @@ protected:
         if (proto_uid == uid) {
           uint8_t ok[64] = { 0 };
           uint8_t* p = yx::_write_u16(ok, 4);
-          int p_type = TOCLIENT_BREATH;
-          p[0] = p_type & 0xff;
-          p[1] = 0;
-          p[1] |= ((p_type >> 8) << 6);
-          uint8_t encryptType = 1;
-          p[1] |= (encryptType << 1);
+          _write_proto_cmd(p, TOCLIENT_BREATH);
           //
           pbc_slice proto_slice;
           proto_slice.buffer = ok;
@@ -287,12 +290,7 @@ protected:
 
         uint8_t ok[64] = { 0 };
         uint8_t* p = yx::_write_u16(ok, 4);
-        int p_type = TOCLIENT_BREATH;
-        p[0] = p_type & 0xff;
-        p[1] = 0;
-        p[1] |= ((p_type >> 8) << 6);
-        uint8_t encryptType = 1;
-        p[1] |= (encryptType << 1);
+        _write_proto_cmd(p, TOCLIENT_BREATH);
         //
         pbc_slice proto_slice;
         proto_slice.buffer = ok;
@@ -303,12 +301,7 @@ protected:
       } else {
         uint8_t ok[64] = { 0 };
         uint8_t* p = yx::_write_u16(ok, 4);
-        int p_type = TOCLIENT_BREATH;
-        p[0] = p_type & 0xff;
-        p[1] = 0;
-        p[1] |= ((p_type >> 8) << 6);
-        uint8_t encryptType = 1;
-        p[1] |= (encryptType << 1);
+        _write_proto_cmd(p, TOCLIENT_BREATH);
         //
         pbc_slice proto_slice;
         proto_slice.buffer = ok;
@@ -319,6 +312,16 @@ protected:
       }
       //
       
+      return;
+    } else {
+      // 没有特殊处理就原包返回。
+      // 这里默认解密是XOR，没压缩。
+      for (int i = 0; i < data->len; i++) {
+        static_cast<uint8_t*>(data->buffer)[i] ^= 165;
+      }
+      data->len += 4;
+      data->buffer = static_cast<uint8_t*>(data->buffer) - 4;
+      SendProto(uid, QMT_GAME, data);
       return;
     }
   }

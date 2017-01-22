@@ -248,11 +248,11 @@ private:
   typedef std::map<uint64_t/*uid*/, pending_login> pending_logins2_t;
   pending_logins2_t pending_logins2_;
   struct Game {
-    bool m_GameServerStarted;  // gameServer是否启动
+    //bool m_GameServerStarted;  // gameServer是否启动
     bool m_GameServerActive;
     uint64_t m_LastBreatheTimestamp;
     Game() {
-      m_GameServerStarted = false;
+      //m_GameServerStarted = false;
       m_GameServerActive = false; // 初始化时为false,不允许往RecvClientMsgsQueue里添加消息。只有收到网关心跳后才能发消息
       m_LastBreatheTimestamp = 0;
     }

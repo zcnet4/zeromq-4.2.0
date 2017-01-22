@@ -2,7 +2,7 @@
 //	FileName		:	D:\yx_code\yx\gateway\yw_server.cpp
 //	Creator			:	(zc) <zcnet4@gmail.com>
 //	CreateTime	:	2016-11-14 14:02
-//	Description	:	
+//	Description	:
 //
 // -----------------------------------------------------------------------*/
 #include "yw_server.h"
@@ -32,6 +32,13 @@
 #endif // OS_WIN
 // -------------------------------------------------------------------------
 #define PROTO_HEAD_SIZE 4
+inline void _write_proto_cmd(uint8_t* buf, int type)  {
+  buf[0] = type & 0xff;
+  buf[1] = 0;           
+  buf[1] |= ((type >> 8) << 6); 
+  uint8_t encryptType = 1; 
+  buf[1] |= (encryptType << 1); 
+}
 //////////////////////////////////////////////////////////////////////////
 // AgentYW
 class YWServer::AgentYW
@@ -531,6 +538,7 @@ void YWServer::processQueueServerValidateResult(uint32_t world_id, uint64_t uid,
 */
 bool YWServer::processGameMsg(uint32_t world_id, uint64_t uid, uint32_t type,
   const uint8_t* buf, uint16_t buf_size, yx::Packet& packet) {
+  //
   bool success = false;
   switch (type) {
   case QMT_INVALID:
@@ -733,11 +741,7 @@ yx::Packet YWServer::buildClientMsg(int32_t type, pbc_slice* data) {
   uint8_t* buf = packet.mutable_buf();
   uint16_t buf_size = packet.buf_size();
   //
-  buf[0] = type & 0xff;
-  buf[1] = 0;
-  buf[1] |= ((type >> 8) << 6);
-  uint8_t encryptType = 1;
-  buf[1] |= (encryptType << 1);
+  _write_proto_cmd(buf, type);
   buf += sizeof(uint16_t);
   buf_size -= sizeof(uint16_t);
   // Xor
@@ -821,6 +825,8 @@ void YWServer::askGameToLogout(AgentYW* agent) {
   if (agent->status() == AgentYW::GW_CLIENT_STATUS_LOGGING_OUT) {
     // 如果该客户端已经发送了logout，则不需再次发生logout给game server
     return;
+  } else {
+    agent->set_status(AgentYW::GW_CLIENT_STATUS_LOGGING_OUT);
   }
   //
   pbc_wmessage* msg = pbc_wmessage_new(client_pbc_env_, kPROTO_Message);
@@ -838,26 +844,24 @@ void YWServer::askGameToLogout(AgentYW* agent) {
     }
     pbc_slice slice;
     pbc_wmessage_buffer(msg, &slice);
-    pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_GAME, &slice);
+    {
+      uint8_t* buf = (uint8_t*)malloc(4 + slice.len);
+      // Xor
+      for (int i = 0; i < slice.len; i++) {
+        buf[i + 4] = static_cast<uint8_t*>(slice.buffer)[i] ^ 165;
+      }
+      //
+      int type = TOSERVER_LOGOUT;
+      _write_proto_cmd(buf + 2, TOSERVER_LOGOUT);
+      //
+      yx::_write_u16(buf, slice.len + 4);
+      slice.buffer = buf;
+      slice.len += 4;
+      pushMsgToGameServer(agent->world_id(), agent->uid(), QMT_GAME, &slice);
+      free(buf);
+    }
     pbc_wmessage_delete(msg);
   }
-  /*c2s_logout logout;
-  logout.set_param(7777);
-
-  Message *msg = new Message();
-  msg->set_type(TOSERVER_LOGOUT);
-  msg->set_msg_data(logout.SerializeAsString());
-
-  QueuedMsg* qmsg = new QueuedMsg();
-  qmsg->set_uid(uid);
-  qmsg->set_type(QMT_GAME);
-  qmsg->set_data(msg->SerializeAsString());
-  delete msg;
-
-  m_RecvMsgsQueue.push_back(qmsg);
-
-  updateLogoutTime(uid);
-  LOG(TRACE) << "askGameToLogout, uid:" << uid;*/
 }
 
 /*
